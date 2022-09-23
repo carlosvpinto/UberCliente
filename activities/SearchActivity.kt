@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
 import com.google.android.gms.maps.model.LatLng
@@ -92,7 +93,7 @@ class SearchActivity : AppCompatActivity() {
         destinationLatLng = LatLng(extraDestinationLat, extraDestinationLng)
         extraTipo = intent.getStringExtra("tipo")!!
 
-        //VERICA SI VA A BUSCAR UNA MOTO
+
 
 
         //SI EL USUARIO CANCELA LA BUSQUEDA
@@ -101,6 +102,11 @@ class SearchActivity : AppCompatActivity() {
         //VERIFICA SI ES MOTO O CARRO/////
 
         SaberSiesMoto()
+
+        //COLOCA LA ANIMACION CORREPONDIENTE A LA BUSQUEDA
+        BuscaAnimacion(extraTipo)
+
+
         Log.d("TIPOV", "isMoto: $isMoto")
         if (isMoto!= true){
             getClosestDriver()
@@ -109,6 +115,19 @@ class SearchActivity : AppCompatActivity() {
             getClosestDriverMoto()
         }
         checkIfDriverAccept()
+    }
+
+    private fun BuscaAnimacion(tipo:String){
+        Log.d("TIPOV", "VALOR DE TIPO: $tipo")
+      if (tipo=="Moto"){
+          binding.imgJsonBuscarCarro.visibility = View.GONE
+          binding.imgJsonBuscarMoto.visibility = View.VISIBLE
+      }
+        if (tipo=="Carro"){
+            binding.imgJsonBuscarCarro.visibility = View.VISIBLE
+            binding.imgJsonBuscarMoto.visibility = View.GONE
+        }
+
     }
 
     // PARA VOLVER HACER LA BUSQUEDA SI EL CONDUCTOR CANCELA
@@ -347,7 +366,7 @@ class SearchActivity : AppCompatActivity() {
                     getDriverInfo()
                     Log.d("FIRESTORE", "Conductor id: $idDriver")
                     driverLatLng = LatLng(location.latitude, location.longitude)
-                    binding.textViewSearch.text = "CONDUCTOR ENCONTRADO\nESPERANDO RESPUESTA"
+                    binding.textViewSearch.text = "MOTO ENCONTRADA\nESPERANDO RESPUESTA (BUSQUEDA $IntentosBusqueda)/5 $idDriver"
 
                     //CREA EL BOOKING EN ESTADO CREADO
                     createBooking(documentID)

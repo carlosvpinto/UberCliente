@@ -148,7 +148,7 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
         }
     }
 
-
+// VERIFICA LA LOCALIZACION DEL CONDUCTOR ****************
     private fun getLocationDriver() {
         if (booking != null) {
             listenerDriverLocation = geoProvider.getLocationWorking(booking?.idDriver!!).addSnapshotListener { document, e ->

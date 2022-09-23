@@ -23,6 +23,9 @@ import com.carlosvicente.uberkotlin.R
 import com.carlosvicente.uberkotlin.databinding.ActivityTripInfoBinding
 import com.carlosvicente.uberkotlin.models.Prices
 import com.carlosvicente.uberkotlin.providers.ConfigProvider
+import com.carlosvicente.uberkotlin.providers.GeoProvider
+
+
 
 //import com.carlosvicente.uberkotlin.models.Prices
 //import com.carlosvicente.uberkotlin.providers.ConfigProvider
@@ -53,6 +56,10 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
     var time = 0.0
     var total = 0.0
 
+    //CARRO O MOTO
+    private var tipoVehiculo = ""
+    private val geoProvider = GeoProvider()
+
     private var configProvider = ConfigProvider()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,6 +75,7 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
         extraOriginLng = intent.getDoubleExtra("origin_lng", 0.0)
         extraDestinationLat = intent.getDoubleExtra("destination_lat", 0.0)
         extraDestinationLng = intent.getDoubleExtra("destination_lng", 0.0)
+        tipoVehiculo = intent.getStringExtra("tipo")!!
         originLatLng = LatLng(extraOriginLat, extraOriginLng)
         destinationLatLng = LatLng(extraDestinationLat, extraDestinationLng)
 
@@ -86,10 +94,6 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
         binding.textViewOrigin.text = extraOriginName
         binding.textViewDestination.text = extraDestinationName
 
-        Log.d("LOCALIZACION", "Origin lat: ${originLatLng?.latitude}")
-        Log.d("LOCALIZACION", "Origin lng: ${originLatLng?.longitude}")
-        Log.d("LOCALIZACION", "Destination lat: ${destinationLatLng?.latitude}")
-        Log.d("LOCALIZACION", "Destination lng: ${destinationLatLng?.longitude}")
 
         binding.imageViewBack.setOnClickListener { finish() }
         binding.btnConfirmRequest.setOnClickListener { goToSearchDriver() }
@@ -108,7 +112,7 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
             i.putExtra("time", time)
             i.putExtra("distance", distance)
             //PARA MANDAR A BUSCAR CARRO(MOTO)
-            i.putExtra("tipo","Carro")
+            i.putExtra("tipo",tipoVehiculo)
             startActivity(i)
         }
         else {
@@ -116,52 +120,54 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
         }
 
     }
-        //OPTIENE EL PRECIO DE VIAJE!(YO)
+    //OPTIENE EL PRECIO DE VIAJE!(YO)**********
     private fun getPrices(distance: Double, time: Double) {
 
         configProvider.getPrices().addOnSuccessListener { document ->
             if (document.exists()) {
                 val prices = document.toObject(Prices::class.java) // DOCUMENTO CON LA INFORMACION
+                var CcortaMoto = prices?.CcortaMoto
+                var CmediaMoto = prices?.CmediaMoto
+                val CcortaCarro = prices?.CcortaCarro
+                val CmediaCarro = prices?.CMediaCarro
+                val kmCarro = prices?.km
+                val kmMoto = prices?.kmMoto
 
-//                val totalDistance = distance * prices?.km!! // VALOR POR KM
-//                Log.d("PRICES", "totalDistance: $totalDistance")
-//                val totalTime = time * prices?.min!! // VALOR POR MIN
-//                Log.d("PRICES", "totalTime: $totalTime")
-//                var total =  totalDistance + totalTime // TOTAL
-//                Log.d("PRICES", "total: $total")
-//
-//                total = if (total < 5.0) prices?.minValue!! else total
-//                Log.d("PRICES", "new total: $total")
-//
-//                var minTotal = total - prices?.difference!! // TOTAL - 2USD
-//                Log.d("PRICES", "minTotal: $minTotal")
-//
-//                var maxTotal = total + prices?.difference!! // TOTAL + 2USD
-//                Log.d("PRICES", "maxTotal: $maxTotal")
+                if (tipoVehiculo == "Carro"){
 
-                //CALCULOS PERSONALES
-   //             var total = 0.0
-
-                if (distance<5) {
-                    total = 1.0
-                }
-                if (distance>5 && distance<12){
-                    total = 3.0
-                }
-                if (distance>12){
-                    total = distance*0.25
+                    if (distance<5) {
+                        total = CcortaCarro!!.toDouble()
+                    }
+                    if (distance>5 && distance<12){
+                        total = CmediaCarro!!.toDouble()
+                    }
+                    if (distance>12){ // FALTA CALCULAR BIEN DESPUES DE 12KM
+                        total = distance*kmCarro!!.toDouble()
+                    }
                 }
 
+                if (tipoVehiculo == "Moto"){
+                    if (distance<5) {
+                        total = CcortaMoto!!.toDouble()
+                    }
+                    if (distance>5 && distance<12){
+                        total = CmediaMoto!!.toDouble()
+                    }
+                    if (distance>12){ // FALTA CALCULAR BIEN DESPUES DE 12KM
+                        total = distance*kmMoto!!.toDouble()
+                    }
 
+                }
+                Log.d("PRICE", "VALOS FINAL DE TOTAL: $total ")
                 val minTotalString = String.format("%.1f", total)
-              //  val maxTotalString = String.format("%.1f", maxTotal)
+                //  val maxTotalString = String.format("%.1f", maxTotal)
                 binding.textViewPrice.text = "$total$"
-
-
             }
-        }
 
+        }
     }
+
+
 
     private fun addOriginMarker() {
         markerOrigin = googleMap?.addMarker(MarkerOptions().position(originLatLng!!).title("Mi posicion")

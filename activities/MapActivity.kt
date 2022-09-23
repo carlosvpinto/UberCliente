@@ -158,7 +158,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
 
         }
     }
-//CREAMOSUN MARCADOR PARA LA MOTO CONECYADA
+//CREAMOS UN MARCADOR PARA LA MOTO CONECTADA
     private fun getNearbyDriversMoto() {
 
         if (myLocationLatLng == null) return
@@ -331,13 +331,14 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     private fun goToTripMotoInfo() {
 
         if (originLatLng != null && destinationLatLng != null) {
-            val i = Intent(this, TripInfoMotoActivity::class.java)
+            val i = Intent(this, TripInfoActivity::class.java) //ELIMINE EL ACTIVITY TRIP MOTO PARA COLOCAR CAMBIAR EL TRIPCTIVITYmOTO
             i.putExtra("origin", originName)
             i.putExtra("destination", destinationName)
             i.putExtra("origin_lat", originLatLng?.latitude)
             i.putExtra("origin_lng", originLatLng?.longitude)
             i.putExtra("destination_lat", destinationLatLng?.latitude)
             i.putExtra("destination_lng", destinationLatLng?.longitude)
+            i.putExtra("tipo", "Moto")
             startActivity(i)
         }
         else {
@@ -355,6 +356,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
             i.putExtra("origin_lng", originLatLng?.longitude)
             i.putExtra("destination_lat", destinationLatLng?.latitude)
             i.putExtra("destination_lng", destinationLatLng?.longitude)
+            i.putExtra("tipo", "Carro")
             startActivity(i)
         }
         else {
