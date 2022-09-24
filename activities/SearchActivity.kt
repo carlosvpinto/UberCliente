@@ -249,10 +249,19 @@ class SearchActivity : AppCompatActivity() {
             }
         }
     }
-
+// ENVIA A LA PANTALLAS MAPTRIPACTIVITY Y ENVIA EL VALOR DEL TIPO DE VEHICULO********
     private fun goToMapTrip() {
         val i = Intent(this, MapTripActivity::class.java)
-        startActivity(i)
+        if (extraTipo=="Moto"){
+            i.putExtra("tipo", "Moto")
+            startActivity(i)
+        }
+
+        if (extraTipo == "Carro"){
+            i.putExtra("tipo", "Carro")
+            startActivity(i)
+        }
+
     }
 
     private fun goToMap() {

@@ -84,6 +84,8 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
     val origin: String? = null
     private var isMoto = false
     private val driverProvider = DriverProvider()
+    private var extraTipo = ""
+
 
     private var modalTrip = ModalBottomSheetTripInfo()
 
@@ -107,7 +109,9 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
 
         binding.imageViewInfo.setOnClickListener { showModalInfo() }
 
-
+        //RECIBE EL TIPO DE VEHICULO DE LA SEARCHACTIVITY**************
+        extraTipo = intent.getStringExtra("tipo")!!
+        Log.d("TIPOV", "VALOR DE EXTRATIPO TRAIDA PANTALLA SEARCHA:= $extraTipo")
         locationPermissions.launch(arrayOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION
@@ -269,14 +273,14 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
     }
 
     private fun addDriverMarker(position: LatLng) {
-        //PARA CAMBIA EL ICONO A UNA MOTO
-        SaberSiesMoto()
-        Log.d("LOCATION", "VARIABLE isMoto $isMoto")
-        if (isMoto== true){
+        //PARA CAMBIA EL ICONO A UNA MOTO**************************
+        //SaberSiesMoto()
+        Log.d("TIPOV", "VARIABLE extraTipo $extraTipo")
+        if (extraTipo== "Moto"){
             markerDriver = googleMap?.addMarker(MarkerOptions().position(position).title("Tu Moto")
                 .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_moto)))
         }
-        if (isMoto== false){
+        if (extraTipo== "Carro"){
             markerDriver = googleMap?.addMarker(MarkerOptions().position(position).title("Tu conductor")
                 .icon(BitmapDescriptorFactory.fromResource(R.drawable.uber_car)))
         }
@@ -368,18 +372,20 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
     }
     // VERIFICA SI ES CARRO O MOTO
     private fun SaberSiesMoto(){
-        driverProvider.getDriver(authProvider.getId()).addOnSuccessListener { document ->
-            if (document.exists()) {
-                val driver = document.toObject(Driver::class.java)
-
-                if (driver?.tipo.toString() == "Carro"){
+        var extraTipo = "Moto"
+        //extraTipo = intent.getStringExtra("tipo")!!
+        //driverProvider.getDriver(authProvider.getId()).addOnSuccessListener { document ->
+            //if (document.exists()) {
+              //  val driver = document.toObject(Driver::class.java)
+        Log.d("TIPOV", "Valor de Extratipo:=: $extraTipo")
+                if (extraTipo == "Carro"){
                     isMoto = false
                 }
-                if (driver?.tipo.toString()=="Moto"){
+                if (extraTipo=="Moto"){
                     isMoto = true
                 }
-            }
-        }
+         //   }
+        //}
     }
 
 
