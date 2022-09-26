@@ -278,11 +278,11 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
         Log.d("TIPOV", "VARIABLE extraTipo $extraTipo")
         if (extraTipo== "Moto"){
             markerDriver = googleMap?.addMarker(MarkerOptions().position(position).title("Tu Moto")
-                .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_moto)))
+                .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_motorverde)))
         }
         if (extraTipo== "Carro"){
             markerDriver = googleMap?.addMarker(MarkerOptions().position(position).title("Tu conductor")
-                .icon(BitmapDescriptorFactory.fromResource(R.drawable.uber_car)))
+                .icon(BitmapDescriptorFactory.fromResource(R.drawable.uber_carverde)))
         }
 
 

@@ -181,7 +181,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
                 val driverLatLng = LatLng(location.latitude, location.longitude)
                 val marker = googleMap?.addMarker(
                     MarkerOptions().position(driverLatLng).title("Moto disponible").icon(
-                        BitmapDescriptorFactory.fromResource(R.drawable.ic_moto)
+                        BitmapDescriptorFactory.fromResource(R.drawable.ic_motorverde)
                     )
                 )
 
@@ -265,7 +265,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
                 val driverLatLng = LatLng(location.latitude, location.longitude)
                 val marker = googleMap?.addMarker(
                     MarkerOptions().position(driverLatLng).title("Conductor disponible").icon(
-                        BitmapDescriptorFactory.fromResource(R.drawable.uber_car)
+                        BitmapDescriptorFactory.fromResource(R.drawable.uber_carverde)
                     )
                 )
 
