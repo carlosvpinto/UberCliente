@@ -10,12 +10,14 @@ import com.carlosvicente.uberkotlin.databinding.ActivityRegisterBinding
 import com.carlosvicente.uberkotlin.models.Client
 import com.carlosvicente.uberkotlin.providers.AuthProvider
 import com.carlosvicente.uberkotlin.providers.ClientProvider
+import com.tommasoberlose.progressdialog.ProgressDialogFragment
 
 class RegisterActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityRegisterBinding
     private  val  authProvider = AuthProvider()
     private val clientProvider= ClientProvider()
+    private var progressDialog = ProgressDialogFragment
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,6 +31,7 @@ class RegisterActivity : AppCompatActivity() {
         binding.btnRegister.setOnClickListener { register() }
     }
     private fun register() {
+        progressDialog.showProgressBar(this)
         val name = binding.textFieldName.text.toString()
         val lastname = binding.textFieldLastname.text.toString()
         val email = binding.textFieldEmail.text.toString()
@@ -53,8 +56,10 @@ class RegisterActivity : AppCompatActivity() {
                                 "Registro exitoso",
                                 Toast.LENGTH_SHORT
                             ).show()
+                            progressDialog.hideProgressBar(this)
                             goToMap()
                           } else {
+                            progressDialog.hideProgressBar(this)
                             Toast.makeText(
                                 this@RegisterActivity,
                                 "Hubo un error Almacenado los datos del usuario ${it.exception.toString()}",

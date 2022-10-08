@@ -21,6 +21,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.bumptech.glide.Glide
 import com.example.easywaylocation.EasyWayLocation
 import com.example.easywaylocation.Listener
 import com.example.easywaylocation.draw_path.DirectionUtil
@@ -61,6 +62,7 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
     private var destinationLatLng: LatLng? = null
     private var booking: Booking? = null
     private var markerOrigin: Marker? = null
+    private var markerOriginFoto: Marker? = null
     private var bookingListener: ListenerRegistration? = null
     private lateinit var binding: ActivityMapTripBinding
     private var googleMap: GoogleMap? = null
@@ -70,6 +72,8 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
     private val geoProvider = GeoProvider()
     private val authProvider = AuthProvider()
     private val bookingProvider = BookingProvider()
+
+    private var driver: Driver? = null
 
 
     private var wayPoints: ArrayList<LatLng> = ArrayList()
@@ -151,6 +155,7 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
             Toast.makeText(this, "No se pudo cargar la informacion", Toast.LENGTH_SHORT).show()
         }
     }
+
 
 // VERIFICA LA LOCALIZACION DEL CONDUCTOR ****************
     private fun getLocationDriver() {
@@ -270,7 +275,9 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
     private fun addOriginMarker(position: LatLng) {
         markerOrigin = googleMap?.addMarker(MarkerOptions().position(position).title("Recoger aqui")
             .icon(BitmapDescriptorFactory.fromResource(R.drawable.icons_location_person)))
+
     }
+
 
     private fun addDriverMarker(position: LatLng) {
         //PARA CAMBIA EL ICONO A UNA MOTO**************************

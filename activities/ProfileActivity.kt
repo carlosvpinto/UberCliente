@@ -16,6 +16,7 @@ import com.carlosvicente.uberkotlin.models.Client
 import com.carlosvicente.uberkotlin.models.Driver
 import com.carlosvicente.uberkotlin.providers.AuthProvider
 import com.carlosvicente.uberkotlin.providers.ClientProvider
+import com.tommasoberlose.progressdialog.ProgressDialogFragment
 import java.io.File
 
 class ProfileActivity : AppCompatActivity() {
@@ -26,12 +27,15 @@ class ProfileActivity : AppCompatActivity() {
 
     private var imageFile: File? = null
 
+    private var progressDialog = ProgressDialogFragment
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityProfileBinding.inflate(layoutInflater)
         setContentView(binding.root)
         window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
 
+        progressDialog.showProgressBar(this)
         getClient()
         binding.imageViewBack.setOnClickListener { finish() }
         binding.btnUpdate.setOnClickListener { updateInfo() }
@@ -98,6 +102,7 @@ class ProfileActivity : AppCompatActivity() {
                     }
                 }
             }
+            progressDialog.hideProgressBar(this)
         }
     }
 

@@ -8,11 +8,13 @@ import android.view.WindowManager
 import android.widget.Toast
 import com.carlosvicente.uberkotlin.databinding.ActivityMainBinding
 import com.carlosvicente.uberkotlin.providers.AuthProvider
+import com.tommasoberlose.progressdialog.ProgressDialogFragment
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     val authProvider = AuthProvider()
+    private var progressDialog = ProgressDialogFragment
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,6 +30,7 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun login() {
+        progressDialog.showProgressBar(this)
         val email = binding.textFieldEmail.text.toString()
         val password = binding.textFieldPassword.text.toString()
 
@@ -35,6 +38,7 @@ class MainActivity : AppCompatActivity() {
             authProvider.login(email, password).addOnCompleteListener {
                 if (it.isSuccessful){
                    goToMap()
+                    progressDialog.hideProgressBar(this)
                 }
                 else {
                     Toast.makeText(this@MainActivity, "ERROR INICANDO SECION", Toast.LENGTH_SHORT).show()

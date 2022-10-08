@@ -24,7 +24,7 @@ import com.carlosvicente.uberkotlin.databinding.ActivityTripInfoBinding
 import com.carlosvicente.uberkotlin.models.Prices
 import com.carlosvicente.uberkotlin.providers.ConfigProvider
 import com.carlosvicente.uberkotlin.providers.GeoProvider
-
+import com.tommasoberlose.progressdialog.ProgressDialogFragment
 
 
 //import com.carlosvicente.uberkotlin.models.Prices
@@ -56,6 +56,8 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
     var time = 0.0
     var total = 0.0
 
+    private var progressDialog = ProgressDialogFragment
+
     //CARRO O MOTO
     private var tipoVehiculo = ""
     private val geoProvider = GeoProvider()
@@ -67,7 +69,7 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
         binding = ActivityTripInfoBinding.inflate(layoutInflater)
         setContentView(binding.root)
         window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
-
+        progressDialog.showProgressBar(this)
         // EXTRAS
         extraOriginName = intent.getStringExtra("origin")!!
         extraDestinationName = intent.getStringExtra("destination")!!
@@ -162,6 +164,8 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
                 val minTotalString = String.format("%.1f", total)
                 //  val maxTotalString = String.format("%.1f", maxTotal)
                 binding.textViewPrice.text = "$total$"
+
+                progressDialog.hideProgressBar(this)
             }
 
         }
@@ -177,6 +181,7 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
     private fun addDestinationMarker() {
         markerDestination = googleMap?.addMarker(MarkerOptions().position(destinationLatLng!!).title("LLegada")
             .icon(BitmapDescriptorFactory.fromResource(R.drawable.icons_pin)))
+
     }
 
     private fun easyDrawRoute() {
@@ -195,11 +200,13 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
             .build()
 
         directionUtil.initPath()
+
     }
 
     override fun onMapReady(map: GoogleMap) {
         googleMap = map
         googleMap?.uiSettings?.isZoomControlsEnabled = true
+
 // ACTIVA LA POSCION DE LA CAMARA (YO)
         googleMap?.moveCamera(
             CameraUpdateFactory.newCameraPosition(

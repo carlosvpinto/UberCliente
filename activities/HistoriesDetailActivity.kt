@@ -14,18 +14,22 @@ import com.carlosvicente.uberkotlin.providers.ClientProvider
 import com.carlosvicente.uberkotlin.providers.DriverProvider
 import com.carlosvicente.uberkotlin.providers.HistoryProvider
 import com.carlosvicente.uberkotlin.utils.RelativeTime
+import com.tommasoberlose.progressdialog.ProgressDialogFragment
 
 class HistoriesDetailActivity : AppCompatActivity() {
     private lateinit var binding: ActivityHistoryDetailBinding
     private var historyProvider = HistoryProvider()
     private var driverProvider = DriverProvider()
     private var extraId = ""
+    private var progressDialog = ProgressDialogFragment
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityHistoryDetailBinding.inflate(layoutInflater)
         setContentView(binding.root)
         window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
 
+        progressDialog.showProgressBar(this)
         extraId = intent.getStringExtra("id")!!
         getHistory()
 
@@ -63,5 +67,6 @@ class HistoriesDetailActivity : AppCompatActivity() {
                 }
             }
         }
+        progressDialog.hideProgressBar(this)
     }
 }
