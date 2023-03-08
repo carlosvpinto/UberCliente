@@ -10,6 +10,7 @@ data class Prices (
     val CcortaMoto: Double? = null,
     val CmediaMoto: Double? = null,
     val km: Double? = null,
+    val kmCarro: Double? = null,
     val kmMoto: Double? = null,
     val min: Double? = null,
     val minValue: Double? = null,

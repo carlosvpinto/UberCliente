@@ -55,5 +55,10 @@ class GeoProvider {
     fun getLocationWorking(idDriver: String): DocumentReference {
         return collectionWorking.document(idDriver)
     }
+    fun getLocatioPrioridad(idDriver: String): Task<DocumentSnapshot> {
+        return collection.document(idDriver).get().addOnFailureListener { exception ->
+            Log.d("FIREBASE", "ERROR: ${exception.toString()}")
+        }
+    }
 
 }

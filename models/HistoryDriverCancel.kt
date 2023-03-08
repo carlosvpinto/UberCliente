@@ -5,15 +5,12 @@ import java.util.*
 
 private val klaxon = Klaxon()
 
-data class History (
+data class HistoryDriverCancel (
     var id: String? = null,
     val idClient: String? = null,
     val idDriver: String? = null,
     val origin: String? = null,
     val destination: String? = null,
-    val calificationToClient: Double? = null,
-    val calificationToDriver: Double? = null,
-    val time: Int? = null,
     val km: Double? = null,
     val originLat: Double? = null,
     val originLng: Double? = null,
@@ -21,7 +18,8 @@ data class History (
     val destinationLng: Double? = null,
     val price: Double? = null,
     val timestamp: Long? = null,
-    val date: Date?= null,
+    val causa: String? = null,
+    val fecha: Date? = null,
 ) {
     public fun toJson() = klaxon.toJsonString(this)
 

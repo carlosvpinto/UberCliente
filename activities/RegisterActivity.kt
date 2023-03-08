@@ -10,12 +10,14 @@ import com.carlosvicente.uberkotlin.databinding.ActivityRegisterBinding
 import com.carlosvicente.uberkotlin.models.Client
 import com.carlosvicente.uberkotlin.providers.AuthProvider
 import com.carlosvicente.uberkotlin.providers.ClientProvider
+import com.tommasoberlose.progressdialog.ProgressDialogFragment
 
 class RegisterActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityRegisterBinding
     private  val  authProvider = AuthProvider()
     private val clientProvider= ClientProvider()
+    private var progressDialog = ProgressDialogFragment
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,8 +55,10 @@ class RegisterActivity : AppCompatActivity() {
                                 "Registro exitoso",
                                 Toast.LENGTH_SHORT
                             ).show()
+
                             goToMap()
                           } else {
+
                             Toast.makeText(
                                 this@RegisterActivity,
                                 "Hubo un error Almacenado los datos del usuario ${it.exception.toString()}",
@@ -89,34 +93,42 @@ class RegisterActivity : AppCompatActivity() {
 
         if (name.isEmpty()) {
             Toast.makeText(this, "Debes ingresar tu nombre", Toast.LENGTH_SHORT).show()
+
             return false
         }
         if (lastname.isEmpty()) {
             Toast.makeText(this, "Debes ingresar tu apellido", Toast.LENGTH_SHORT).show()
+
             return false
         }
         if (email.isEmpty()) {
             Toast.makeText(this, "Debes ingresar tu correo electronico", Toast.LENGTH_SHORT).show()
+
             return false
         }
         if (phone.isEmpty()) {
             Toast.makeText(this, "Debes ingresar tu telefono", Toast.LENGTH_SHORT).show()
+
             return false
         }
         if (password.isEmpty()) {
             Toast.makeText(this, "Debes ingresar la contraseña", Toast.LENGTH_SHORT).show()
+
             return false
         }
         if (confirmPassword.isEmpty()) {
             Toast.makeText(this, "Debes ingresar la confirmacion de la contraseña", Toast.LENGTH_SHORT).show()
+
             return false
         }
         if (password != confirmPassword) {
             Toast.makeText(this, "las contraseñas deben coincidir", Toast.LENGTH_SHORT).show()
+
             return false
         }
         if (password.length < 6) {
             Toast.makeText(this, "la contraseña deben tener al menos 6 caracteres", Toast.LENGTH_LONG).show()
+
             return false
         }
 

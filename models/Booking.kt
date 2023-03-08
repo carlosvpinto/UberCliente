@@ -2,11 +2,14 @@ package com.carlosvicente.uberkotlin.models
 
 
 import com.beust.klaxon.*
+import java.time.Instant
+import java.util.*
 
 private val klaxon = Klaxon()
 
 data class Booking (
     val id: String? = null,
+    val activo: Boolean = true,
     val idClient: String? = null,
     val idDriver: String? = null,
     val origin: String? = null,
@@ -19,6 +22,8 @@ data class Booking (
     val destinationLat: Double? = null,
     val destinationLng: Double? = null,
     val price: Double? = null,
+    val date: Date? = null,
+
 ) {
     public fun toJson() = klaxon.toJsonString(this)
 

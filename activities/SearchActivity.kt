@@ -1,33 +1,45 @@
 package com.carlosvicente.uberkotlin.activities
 
 
+import android.app.Activity
+import android.content.DialogInterface
 import android.content.Intent
+import android.graphics.Color
+import android.location.Location
+import android.media.Ringtone
+import android.media.RingtoneManager
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.CountDownTimer
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import com.bumptech.glide.Glide
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.ktx.toObject
 import com.carlosvicente.uberkotlin.databinding.ActivitySearchBinding
-import com.carlosvicente.uberkotlin.models.Booking
+import com.carlosvicente.uberkotlin.models.*
 import com.carlosvicente.uberkotlin.providers.AuthProvider
 import com.carlosvicente.uberkotlin.providers.BookingProvider
+import com.carlosvicente.uberkotlin.providers.SolicitudesRealiProvider
 import com.carlosvicente.uberkotlin.providers.GeoProvider
 import org.imperiumlabs.geofirestore.callbacks.GeoQueryEventListener
+import com.ekn.gruzer.gaugelibrary.Range
 
 
-import com.carlosvicente.uberkotlin.models.Driver
-import com.carlosvicente.uberkotlin.models.FCMBody
-import com.carlosvicente.uberkotlin.models.FCMResponse
+
+
 import com.carlosvicente.uberkotlin.providers.*
 import com.example.easywaylocation.EasyWayLocation
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
+import java.util.*
+import kotlin.collections.HashMap
 
 
 class SearchActivity : AppCompatActivity() {
@@ -53,19 +65,34 @@ class SearchActivity : AppCompatActivity() {
 
     private val geoProvider = GeoProvider()
     private val authProvider = AuthProvider()
+    private val clientProvider = ClientProvider()
     private val bookingProvider = BookingProvider()
+    private val solicitudesRealiProvider = SolicitudesRealiProvider()
     private val notificationProvider = NotificationProvider()
     private val driverProvider = DriverProvider()
+    private val historyCancelProvider = HistoryCancelProvider()
+
+    private var swTiempo = false
 
 
     // BUSQUEDA DEL CONDUCTOR
     private var radius = 0.2
     private var idDriver = ""
     private var driver: Driver? = null
+    private var cliente: Client? = null
     private var isDriverFound = false
+    private var prioridadDisponible: Boolean = true
+    private var suichePrioridad = false
     private var driverLatLng: LatLng? = null
     private var limitRadius = 30
     private var IntentosBusqueda = 1
+    val date = Date()
+    var countDownTimer: CountDownTimer? = null
+
+    var valor = 50.0
+
+    private var bookinglate: Booking? = null
+
 
     //Moto
     val origin: String? = null
@@ -93,28 +120,91 @@ class SearchActivity : AppCompatActivity() {
         destinationLatLng = LatLng(extraDestinationLat, extraDestinationLng)
         extraTipo = intent.getStringExtra("tipo")!!
 
-
+       // getClient()//OBTIENE LA INFORMCIONDEL CLIENTE ******* YO *****************
 
 
         //SI EL USUARIO CANCELA LA BUSQUEDA
-        binding.btnCancelBusqueda .setOnClickListener { cancelSolicitud() }
+        binding.btnCancelBusqueda .setOnClickListener { mostrarDialog() }
+        iniciarBusqueda()
+        configurarGaude()
 
-        //VERIFICA SI ES MOTO O CARRO/////
+    }
 
-        SaberSiesMoto()
+//INICIAR BUSQUEDA****YO**************
+    private fun iniciarBusqueda(){
+    //VERIFICA SI ES MOTO O CARRO/////
+    //disconnectDriver()
+    getClient()//OBTIENE LA INFORMCIONDEL CLIENTE ******* YO *****************
+    SaberSiesMoto()
+//    isDriverFound = false
+//    prioridadDisponible= false
+//    suichePrioridad= true
+//    idDriver= ""
+    Log.d("prioridad", "INICIANDO BUSQUEDA: IDDRIVER $idDriver")
+    //COLOCA LA ANIMACION CORREPONDIENTE A LA BUSQUEDA
+    BuscaAnimacion(extraTipo)
+    if (isMoto!= true){
+        Log.d("prioridad", "ENTRA A TIPO DE VEHICULO: $isMoto")
+        getClosestDriver()
+    }
+    if (isMoto!= false){
+        getClosestDriverMoto()
+    }
+    checkIfDriverAccept()
+    }
 
-        //COLOCA LA ANIMACION CORREPONDIENTE A LA BUSQUEDA
-        BuscaAnimacion(extraTipo)
+
+    // TEMPORORIZADOR DE ESPERA DE RESPUESTA DEL CONDUCTOR********************YO*********
+    private fun activartiempo(){
+        countDownTimer = object : CountDownTimer(60000,1000){
+            override fun onTick(millisUntilFinished: Long) {
+                val segundo = (millisUntilFinished/1000).toInt()
+                binding.txtTiempoNro.text= segundo.toString()
+                binding.fullGauge.value= segundo.toDouble()
+            }
+
+            override fun onFinish() {
+                disconnectDriver()//DESCONECTA AL CONDUCTOR
+                if (!swTiempo){
+                    swTiempo= false
+                    cancelBooking(authProvider.getId())
+                }
 
 
-        Log.d("TIPOV", "isMoto: $isMoto")
-        if (isMoto!= true){
-            getClosestDriver()
-        }
-        if (isMoto!= false){
-            getClosestDriverMoto()
-        }
-        checkIfDriverAccept()
+
+            }
+
+        }.start()
+    }
+    //configurar la barra de tiempo Gaude ***yo ******************
+    private fun configurarGaude(){
+        val range = Range()
+        range.color = Color.parseColor("#ce0000")
+        range.from = 0.0
+        range.to = 15.0
+
+        val range2 = Range()
+        range2.color = Color.parseColor("#E3E500")
+        range2.from = 15.0
+        range2.to = 45.0
+
+        val range3 = Range()
+        range3.color = Color.parseColor("#00b20b")
+        range3.from = 45.0
+        range3.to = 60.0
+
+        binding.fullGauge.minValue = 0.0
+        binding.fullGauge.maxValue = 60.0
+        binding.fullGauge.value = 60.0
+
+
+        binding.fullGauge.addRange(range)
+        binding.fullGauge.addRange(range2)
+        binding.fullGauge.addRange(range3)
+
+        binding.fullGauge.isUseRangeBGColor = true
+        binding.fullGauge.isDisplayValuePoint = false
+
     }
 
     private fun BuscaAnimacion(tipo:String){
@@ -151,28 +241,19 @@ class SearchActivity : AppCompatActivity() {
 
     //DESCONECTA AL CONDUCTOR QUE RECHAZO EL BOOKING
     private fun disconnectDriver() {
-
-
-
-        Log.d("INTENTOS", "isMoto: $isMoto")
-
-
+        Log.d("desconectar", "en desconectar isMoto: ${isMoto}")
             if (isMoto != true){
                geoProvider.removeLocation(idDriver)
             }
-
-
         // DESCONECTAR MOTO
 
             if(isMoto!=false){
                 geoProvider.removeLocationMoto(idDriver)
             }
-
     }
 
 //NOTIFICACIONES PUSH
     private fun sendNotification() {
-
         val map = HashMap<String, String>()
         map.put("title", "SOLICITUD DE VIAJE")
         map.put(
@@ -200,7 +281,6 @@ class SearchActivity : AppCompatActivity() {
                     else {
                         Toast.makeText(this@SearchActivity, "No se pudo enviar la notificacion", Toast.LENGTH_LONG).show()
                     }
-
                 }
                 else {
                     Toast.makeText(this@SearchActivity, "hubo un error enviando la notificacion", Toast.LENGTH_LONG).show()
@@ -226,33 +306,43 @@ class SearchActivity : AppCompatActivity() {
                 val booking = snapshot.toObject(Booking::class.java)
 
                 if (booking?.status == "accept") {
-                    Toast.makeText(this@SearchActivity, "Viaje aceptado", Toast.LENGTH_SHORT).show()
+                    Log.d("prioridad", "VALOR DE BOOKING.STATUS: ${booking?.status}")
+                    Toast.makeText(this@SearchActivity, "Viaje aceptado", Toast.LENGTH_LONG).show()
+                    swTiempo= true
+                    if (countDownTimer != null && countDownTimer?.onFinish()!= null ){
+                        swTiempo= true
+                        countDownTimer?.cancel()
+                    }
+
                     listenerBooking?.remove()
                     goToMapTrip()
                 }
                 else if (booking?.status == "cancel") {
 
                     //SI EL CONDUCTOR CANCELA LA PETICION DE BOOKING(RESERVA)
-                    Toast.makeText(this@SearchActivity, "Viaje cancelado", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@SearchActivity, "Viaje cancelado por el conductor Intente de Nuevo", Toast.LENGTH_LONG).show()
+                    countDownTimer?.cancel()
                     listenerBooking?.remove()
                     removeBooking()
-                    if (IntentosBusqueda <5){
-                        IntentosBusqueda++
-                        Log.d("INTENTOS", "IntentosBusqueda: ${IntentosBusqueda}")
-                        vuelveBuscarSiCancela()
-                    }else{
                         goToMap()
-                    }
-
                 }
 
             }
         }
     }
-
+// ENVIA A LA PANTALLAS MAPTRIPACTIVITY Y ENVIA EL VALOR DEL TIPO DE VEHICULO********
     private fun goToMapTrip() {
         val i = Intent(this, MapTripActivity::class.java)
-        startActivity(i)
+        if (extraTipo=="Moto"){
+            i.putExtra("tipo", "Moto")
+            startActivity(i)
+        }
+
+        if (extraTipo == "Carro"){
+            i.putExtra("tipo", "Carro")
+            startActivity(i)
+        }
+
     }
 
     private fun goToMap() {
@@ -275,18 +365,48 @@ class SearchActivity : AppCompatActivity() {
             originLat = extraOriginLat,
             originLng = extraOriginLng,
             destinationLat = extraDestinationLat,
-            destinationLng = extraDestinationLng
+            destinationLng = extraDestinationLng,
+            date= Date()
         )
-
+        bookinglate = booking
         bookingProvider.create(booking).addOnCompleteListener {
             if (it.isSuccessful) {
-                Toast.makeText(this@SearchActivity, "Datos del viaje creados", Toast.LENGTH_LONG).show()
+               // Toast.makeText(this@SearchActivity, "Datos del viaje creados", Toast.LENGTH_LONG).show()
             }
             else {
                 Toast.makeText(this@SearchActivity, "Error al crear los datos", Toast.LENGTH_LONG).show()
             }
         }
     }
+
+    //CREA LA  registro de solicitudes con ESTATUS "create"****** YO ********************
+    private fun createSolicitudes(idCliente: String) {
+        Log.d("CLIENTE", "Dentro de creando solicitudes: ${cliente?.email} ${cliente?.name} ${cliente?.lastname}")
+        val solicitudes = SolicitudesRealizadas(
+            idClient = idCliente,
+            idDriver = idDriver,
+            email = cliente?.email,
+            phone = cliente?.phone,
+            name = cliente?.name,
+            lastname = cliente?.lastname,
+            image = cliente?.image,
+            destination = extraDestinationName,
+            origin = extraOriginName,
+            time = extraTime,
+            km = extraDistance,
+            fecha= Date()
+        )
+
+        solicitudesRealiProvider.create(solicitudes).addOnCompleteListener {
+            if (it.isSuccessful) {
+                // Toast.makeText(this@SearchActivity, "Datos del viaje creados", Toast.LENGTH_LONG).show()
+            }
+            else {
+                Toast.makeText(this@SearchActivity, "Error al crear los datos", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    //********************************************************************************************
 
 
 
@@ -296,10 +416,76 @@ class SearchActivity : AppCompatActivity() {
         driverProvider.getDriver(idDriver).addOnSuccessListener { document ->
             if (document.exists()) {
                 driver = document.toObject(Driver::class.java)
-                sendNotification()
+                Log.d("CONDUCTOR", "CONDUCTOR ENCONTRADO EN getDriverInfo: ${Driver} y:  ${driver?.name}")
+                //CARGA LOS DATOS DEL CONDUCTOR A LA BUSQUEDA***********
+
+                Log.d("CONDUCTOR", "CONDUCTOR ENCONTRADO EN datosConductorencontrado: ${driver?.id} y:  ${driver?.name}")
+                binding.layoutdatosConductor.visibility = View.VISIBLE
+                binding.layoutMarcadorTiempo.visibility= View.VISIBLE
+                binding.imgJsonBuscarCarro.visibility = View.GONE
+
+                if (driver?.image != null) {
+                    if (driver?.image != "") {
+                        Glide.with(this@SearchActivity).load(driver?.image).into(binding.circleImageConductor)
+                    }
+                }
+                binding.txtNombreConductor.text=driver?.name.toString()
+                activartiempo()
+                //*************************************************
+
             }
         }
 
+    }
+
+
+
+//CANCELA LA SOLICITUD DE VIAJE Y MANDA A GENERAR LA HISTORIA
+    fun cancelBooking(idClient: String) {
+        bookingProvider.updateStatus(idClient, "cancel").addOnCompleteListener {
+
+            createHistoryCancel()//CREA HISTORIA DE BOOKING CANCELADOS*******************
+
+
+        }
+    }
+
+    //CREA HISTORIA DE BOOKING CANCELADOS!!!!**************************
+    private fun createHistoryCancel() {
+        Log.d("PRICE", "VALOR DE TOTAL  ")
+        val historyCancel = HistoryDriverCancel(
+            idDriver = bookinglate?.idDriver,
+            idClient = authProvider.getId(),
+            origin = bookinglate?.origin,
+            destination = bookinglate?.destination,
+            originLat = bookinglate?.originLat,
+            originLng = bookinglate?.originLng,
+            destinationLat = bookinglate?.destinationLat,
+            destinationLng = bookinglate?.destinationLng,
+            timestamp = Date().time,
+            causa = "Tiempo de Respuesta Condutor",
+            fecha = date
+
+        )
+        historyCancelProvider.create(historyCancel).addOnCompleteListener {
+            if (it.isSuccessful) {
+
+                Log.d("HISTOCANCEL", "LA HISTORIA DE CANCEL $historyCancel ")
+
+            }
+        }
+    }
+    //OBTIENE LA INFOR DEL CLIENTE ****YO***********************************TRAIDO
+    private fun getClient() {
+        Log.d("CLIENTE", "fuera de getClient: ${authProvider.getId()}")
+        clientProvider.getClientById(authProvider.getId()).addOnSuccessListener { document ->
+            if (document.exists()) {
+                val client = document.toObject(Client::class.java)
+                cliente = client
+                Log.d("CLIENTE", "en getcliente: ${client?.email} ${client?.name} ${client?.lastname}")
+
+            }
+        }
     }
 
     //PARA BUSCAR SOLO A MOTOS
@@ -311,11 +497,11 @@ class SearchActivity : AppCompatActivity() {
                     isDriverFound = true
                     idDriver = documentID
                     getDriverInfo()
+
                     Log.d("FIRESTORE", "Conductor id: $idDriver")
                     driverLatLng = LatLng(location.latitude, location.longitude)
                     //VERICA CUANTOS INTENTOS DE BUSQUEDA LLEVA
-
-                        binding.textViewSearch.text = "MOTO ENCONTRADA\nESPERANDO RESPUESTA (BUSQUEDA $IntentosBusqueda)/5 $idDriver"
+                        binding.textViewSearch.text = "MOTO ENCONTRADA\nESPERANDO RESPUESTA DE CONDUCTOR S/N:$idDriver"
 
 
 
@@ -355,21 +541,73 @@ class SearchActivity : AppCompatActivity() {
     }
 
 
-// BUSCA SOLO CARRO
-    private fun getClosestDriver() {
+        // BUSCA SOLO CARRO/**************************
+    private fun  getClosestDriver() {
+            Log.d("prioridad", "getClosestDriver: IDDRIVER $idDriver")
+        //BUSCA AL CONDUCTOR PRIORIDAD() ********
+        if (!suichePrioridad){
+            suichePrioridad= true
+            geoProvider.getLocatioPrioridad("hrypyVnj1UQI673pQwgtpHmEqWh2").addOnSuccessListener { document ->
+                if (document.exists()) {
+                    if (document.contains("l")) {
+                        prioridadDisponible = true
+                        Log.d("Prioridad", "CONDUCTOR PRORITARIO  DISPONIBLE:$prioridadDisponible ")
+                    }else{
+                        prioridadDisponible= false
+                        Log.d("Prioridad", "CONDUCTOR PRORITARIO NO DISPONIBLE:$prioridadDisponible ")
+                    }
+                }
+            }
+        }
+
+        //**********************************
+            Log.d("Prioridad", "ANTES DE getNearbyDrivers  getNearbyDrivers getNearbyDrivers: $radius y prioridadDisponible:$prioridadDisponible ")
         geoProvider.getNearbyDrivers(originLatLng!!, radius).addGeoQueryEventListener(object: GeoQueryEventListener {
 
             override fun onKeyEntered(documentID: String, location: GeoPoint) {
+                Log.d("prioridad", "override onKeyEntered: IDDRIVER $idDriver")
                 if (!isDriverFound) {
-                    isDriverFound = true
-                    idDriver = documentID
-                    getDriverInfo()
-                    Log.d("FIRESTORE", "Conductor id: $idDriver")
-                    driverLatLng = LatLng(location.latitude, location.longitude)
-                    binding.textViewSearch.text = "MOTO ENCONTRADA\nESPERANDO RESPUESTA (BUSQUEDA $IntentosBusqueda)/5 $idDriver"
+                    //LOCALIZA AL TAXI CON PRIORIDAD*****YO***************
 
-                    //CREA EL BOOKING EN ESTADO CREADO
-                    createBooking(documentID)
+                        if (prioridadDisponible){
+                            val idDriverorioridad = "hrypyVnj1UQI673pQwgtpHmEqWh2"
+                            //val idDriverPrioridad2 = "OLkkqbfz3eUxajXSBnbxfCzU0Qi2"
+                            Log.d("Prioridad", "override onKeyEntered Prioridad Disponible verdadera:$prioridadDisponible y Radius: $radius")
+
+                          if (documentID== idDriverorioridad){
+                              isDriverFound = true
+                              idDriver = documentID
+                              getDriverInfo()
+
+                              Log.d("Prioridad", "override onKeyEntered despues del getDriverInfo :${driver?.name} $prioridadDisponible y Radius: $radius")
+                              driverLatLng = LatLng(location.latitude, location.longitude)
+                              binding.textViewSearch.text = "VEHICULO ENCONTRADO\n" +
+                                      "ESPERANDO RESPUESTA DEL CONDUCTOR S/N:$idDriver"
+
+                              suichePrioridad= false
+                              createBooking(documentID)
+                              createSolicitudes(authProvider.getId() )
+
+                          }
+
+                        }else{
+                            if (!prioridadDisponible){
+                                isDriverFound = true
+                                idDriver = documentID
+                                getDriverInfo()
+
+                                Log.d("Prioridad", "Conductor CUANDO NO ESTA ACTIVO PRIORITY: $idDriver y prioridadDisponible $prioridadDisponible")
+                                driverLatLng = LatLng(location.latitude, location.longitude)
+                                binding.textViewSearch.text = "VEHICULO ENCONTRADO\nESPERANDO RESPUESTA DEL CONDUCTOR S/N:$idDriver"
+
+                                suichePrioridad = false
+                                //CREA EL BOOKING EN ESTADO CREADO
+                                createBooking(documentID)
+                                createSolicitudes(authProvider.getId() )
+                            }
+
+                        }
+
                 }
             }
 
@@ -386,11 +624,19 @@ class SearchActivity : AppCompatActivity() {
             }
 
             override fun onGeoQueryReady() { // TERMINA LA BUSQUEDA
+                Log.d("prioridad", "onGeoQueryReady: IDDRIVER y RADIUS $idDriver y: $radius")
                 if (!isDriverFound) {
                     radius = radius + 0.2
+                    if(radius>12.0 && prioridadDisponible ==true){
+                        Log.d("Prioridad", "ENTRO A RADIUS MAS DE 12:$prioridadDisponible y Radius: $radius")
+                        prioridadDisponible= false
+                        radius = 0.0
+                    }
 
                     if (radius > limitRadius) {
+                        Log.d("Prioridad", "entro a limit radius $radius")
                         binding.textViewSearch.text = "NO SE ENCONTRO NINGUN CONDUCTOR"
+                        removeBooking()//REMUEVE EL BOOKING PORQ NO CONSIGUIO EL CONDUCTOR ******YO*******
                         return
                     }
                     else {
@@ -402,11 +648,8 @@ class SearchActivity : AppCompatActivity() {
         })
     }
 
-    //BORRA EL ESCUCHADOR DEL CLIENTE
-    override fun onDestroy() {
-        super.onDestroy()
-        listenerBooking?.remove()
-    }
+
+
     // VERIFICA SI ES CARRO O MOTO
     private fun SaberSiesMoto(){
 
@@ -417,6 +660,19 @@ class SearchActivity : AppCompatActivity() {
                     isMoto = false
         }
         Log.d("TIPOV", "Moto o Carro: $isMoto")
+    }
+
+    //MENSAGE DE CONFIRMACION DE SALIDA*********************
+
+    fun mostrarDialog(){
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Cancelar Solitudud")
+        builder.setMessage("Desea cancelar la Busqueda")
+        builder.setPositiveButton("Si", DialogInterface.OnClickListener { dialog, which ->
+            cancelSolicitud()
+        })
+        builder.setNegativeButton("No",null )
+        builder.show()
     }
 
     // BORRA EL BOOKING Y VUELVE AL MAP ACTIVITY
@@ -432,15 +688,32 @@ class SearchActivity : AppCompatActivity() {
 
             if (document.exists()) {
                 val booking = document.toObject(Booking::class.java)
-                if (booking?.status == "create" || booking?.status == "cancel") {
+                if (booking?.status == "create"|| booking?.status == "cancel" ) { // Como iba antes || booking?.status == "cancel"
                     bookingProvider.remove()
                 }
             }
 
         }
     }
+    //************************************************************************
+    override fun onBackPressed() {
+        mostrarDialog()
+        return
+        super.onBackPressed()
+    }
 
+    //BORRA EL ESCUCHADOR DEL CLIENTE
+    override fun onDestroy() {
+        super.onDestroy()
+        listenerBooking?.remove()
+    }
+private fun sincronizar(){
+    val intent = Intent("com.carlosvicente.uberkotlin.ACTION_SYNC_TIMER").apply {
+        putExtra("time", System.currentTimeMillis())
+    }
+    sendBroadcast(intent)
 
+}
 
 }
 

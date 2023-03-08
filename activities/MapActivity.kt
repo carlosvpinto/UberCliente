@@ -1,6 +1,7 @@
 package com.carlosvicente.uberkotlin.activities
 
 import android.Manifest
+import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Resources
@@ -18,6 +19,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.carlosvicente.uberkotlin.R
@@ -45,6 +47,8 @@ import com.google.android.libraries.places.api.model.RectangularBounds
 import com.google.android.libraries.places.api.net.PlacesClient
 import com.google.android.libraries.places.widget.AutocompleteSupportFragment
 import com.google.android.libraries.places.widget.listener.PlaceSelectionListener
+import com.google.firebase.analytics.FirebaseAnalytics
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.GeoPoint
 import com.google.maps.android.SphericalUtil
 import org.imperiumlabs.geofirestore.callbacks.GeoQueryEventListener
@@ -52,6 +56,7 @@ import org.imperiumlabs.geofirestore.callbacks.GeoQueryEventListener
 class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
 
     private lateinit var binding: ActivityMapBinding
+    private var location: LatLng? = null
     private var googleMap: GoogleMap? = null
     private var easyWayLocation: EasyWayLocation? = null
     private var myLocationLatLng: LatLng? = null
@@ -70,6 +75,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     private var destinationLatLng: LatLng? = null
 
     private var isLocationEnabled = false
+    private var idDriver = ""
 
 
     // PARA MOTO
@@ -81,6 +87,10 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     private val modalMenu = ModalBottomSheetMenu()
     private val tipo = ""
 
+    //PARA VERIFICAR CON GOOGLE
+    private lateinit var auth : FirebaseAuth
+
+
 
 
 
@@ -89,6 +99,11 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
         binding = ActivityMapBinding.inflate(layoutInflater)
         setContentView(binding.root)
         window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+
+
+        //PARA VERIFICAR CON GOOGLE
+        auth = FirebaseAuth.getInstance()
+
 
         val mapFragment = supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
@@ -100,19 +115,34 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
             smallestDisplacement = 1f
         }
 
+
         easyWayLocation = EasyWayLocation(this, locationRequest, false, false, this)
 
         locationPermissions.launch(arrayOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION
         ))
-
+        googleAnalytics()
         startGooglePlaces()
         removeBooking()
         createToken()
+        FirebaseAnalytics.getInstance(this)
         binding.btnSolicitarMoto.setOnClickListener { goToTripMotoInfo() }
-        binding.btnRequestTrip.setOnClickListener { goToTripInfo() }
+        binding.btnBuscarCarro.setOnClickListener { goToTripInfo() }
         binding.imageViewMenu.setOnClickListener { showModalMenu() }
+        binding.imageViewSalir.setOnClickListener{salirdelApp()}
+
+
+       // binding.txtposicionActual.setOnClickListener{irPosicionActual()}
+    }
+
+
+    //realizar Google Analytics *****yo**************
+    private fun googleAnalytics() {
+        val analytics:FirebaseAnalytics=FirebaseAnalytics.getInstance(this)
+        val bundle= Bundle()
+        bundle.putString("menssage","Integracion de Firebase Analytics Completa")
+        analytics.logEvent("InitScreen",bundle)
     }
 
     val locationPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permission ->
@@ -121,18 +151,50 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
             when {
                 permission.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
                     Log.d("LOCALIZACION", "Permiso concedido")
-                    easyWayLocation?.startLocation()
+                    if (easyWayLocation!=null){
+                        easyWayLocation?.startLocation()
+                    }
 
                 }
                 permission.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
                     Log.d("LOCALIZACION", "Permiso concedido con limitacion")
-                    easyWayLocation?.startLocation()
+                    if (easyWayLocation!= null){
+                        easyWayLocation?.startLocation()
+                    }
+
 
                 }
                 else -> {
                     Log.d("LOCALIZACION", "Permiso no concedido")
+                    Toast.makeText(this, "SIN LOS PERMISO DE UBICACION NO PUEDE FUNCIONAR", Toast.LENGTH_LONG).show()
+                    finishAffinity()
                 }
             }
+        }
+
+    }
+    //MENSAGE DE CONFIRMACION DE SALIDA*********************
+
+    fun salirdelApp(){
+
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Salir")
+        builder.setMessage("Desea salir de la aplicacion TaxiAhora?")
+        builder.setPositiveButton("Salir", DialogInterface.OnClickListener { dialog, which ->
+            easyWayLocation?.endUpdates()
+            finishAffinity()
+        })
+        builder.setNegativeButton("Cancelar",null )
+        builder.show()
+    }
+    //UBICA EN LA POCICION ACTUAL YO**********
+    private fun irPosicionActual(){
+
+        if (myLocationLatLng!=null){
+            googleMap?.moveCamera(
+                CameraUpdateFactory.newCameraPosition(
+                    CameraPosition.builder().target(myLocationLatLng!!).zoom(13f).build()
+                ))
         }
 
     }
@@ -142,16 +204,19 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     }
 
     private fun showModalMenu() {
-        modalMenu.show(supportFragmentManager, ModalBottomSheetMenu.TAG)
+        if (!modalMenu.isAdded()) {
+                modalMenu.show(supportFragmentManager, ModalBottomSheetMenu.TAG)
+        }
+
     }
 
     private fun removeBooking() {
 
         bookingProvider.getBooking().get().addOnSuccessListener { document ->
-
+            Log.d("FIRESTORE", "VALOR DEL DOCUMENT  ${document} ")
             if (document.exists()) {
                 val booking = document.toObject(Booking::class.java)
-                if (booking?.status == "create" || booking?.status == "cancel") {
+                if (booking?.status == "create" || booking?.status == "cancel" ) {// como estava  || booking?.status == "cancel"
                     bookingProvider.remove()
                 }
             }
@@ -163,7 +228,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
 
         if (myLocationLatLng == null) return
 
-        geoProvider.getNearbyDriversMoto(myLocationLatLng!!, 30.0).addGeoQueryEventListener(object: GeoQueryEventListener {
+        geoProvider.getNearbyDriversMoto(myLocationLatLng!!, 170.0).addGeoQueryEventListener(object: GeoQueryEventListener {
 
             override fun onKeyEntered(documentID: String, location: GeoPoint) {
 
@@ -179,18 +244,21 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
                 }
                 // CREAMOS UN NUEVO MARCADOR PARA LA MOTO CONECTADA
                 val driverLatLng = LatLng(location.latitude, location.longitude)
-                val marker = googleMap?.addMarker(
-                    MarkerOptions().position(driverLatLng).title("Moto disponible").icon(
-                        BitmapDescriptorFactory.fromResource(R.drawable.ic_moto)
+                if (driverLatLng!= null){// yo eliminando el error del null********
+                    val marker = googleMap?.addMarker(
+                        MarkerOptions().position(driverLatLng).title(idDriver).icon(
+                            BitmapDescriptorFactory.fromResource(R.drawable.ic_motorverde)
+                        )
                     )
-                )
 
-                marker?.tag = documentID
-                driverMarkersMoto.add(marker!!)
+                    marker?.tag = documentID
+                    driverMarkersMoto.add(marker!!)
 
-                val dl = DriverLocation()
-                dl.id = documentID
-                driversLocationMoto.add(dl)
+                    val dl = DriverLocation()
+                    dl.id = documentID
+                    driversLocationMoto.add(dl)
+                }
+
             }
 
             override fun onKeyExited(documentID: String) {
@@ -243,16 +311,19 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
         })
     }
 
+
+    //CREAMOS UN MARCADOR PARA LOS CARROS CONECTADA
     private fun getNearbyDrivers() {
 
         if (myLocationLatLng == null) return
 
-        geoProvider.getNearbyDrivers(myLocationLatLng!!, 30.0).addGeoQueryEventListener(object: GeoQueryEventListener {
+        geoProvider.getNearbyDrivers(myLocationLatLng!!, 170.0).addGeoQueryEventListener(object: GeoQueryEventListener {
 
             override fun onKeyEntered(documentID: String, location: GeoPoint) {
 
                 Log.d("FIRESTORE", "Document id: $documentID")
                 Log.d("FIRESTORE", "location: $location")
+                idDriver = documentID
 
                 for (marker in driverMarkers) {
                     if (marker.tag != null) {
@@ -264,8 +335,8 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
                 // CREAMOS UN NUEVO MARCADOR PARA EL CONDUCTOR CONECTADO
                 val driverLatLng = LatLng(location.latitude, location.longitude)
                 val marker = googleMap?.addMarker(
-                    MarkerOptions().position(driverLatLng).title("Conductor disponible").icon(
-                        BitmapDescriptorFactory.fromResource(R.drawable.uber_car)
+                    MarkerOptions().position(driverLatLng).title(idDriver).icon(
+                        BitmapDescriptorFactory.fromResource(R.drawable.uber_carverde)
                     )
                 )
 
@@ -329,13 +400,15 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
 
 
     private fun goToTripMotoInfo() {
-
+        irPosicionActual()
         if (originLatLng != null && destinationLatLng != null) {
             val i = Intent(this, TripInfoActivity::class.java) //ELIMINE EL ACTIVITY TRIP MOTO PARA COLOCAR CAMBIAR EL TRIPCTIVITYmOTO
             i.putExtra("origin", originName)
             i.putExtra("destination", destinationName)
-            i.putExtra("origin_lat", originLatLng?.latitude)
-            i.putExtra("origin_lng", originLatLng?.longitude)
+            i.putExtra("origin_lat", myLocationLatLng?.latitude)// para dejar en la posicion origen del celular*********yo***********
+            i.putExtra("origin_lng", myLocationLatLng?.longitude)//***************yo*************
+//            i.putExtra("origin_lat", originLatLng?.latitude)
+//            i.putExtra("origin_lng", originLatLng?.longitude)
             i.putExtra("destination_lat", destinationLatLng?.latitude)
             i.putExtra("destination_lng", destinationLatLng?.longitude)
             i.putExtra("tipo", "Moto")
@@ -347,12 +420,16 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
 
     }
     private fun goToTripInfo() {
+        irPosicionActual()
 
         if (originLatLng != null && destinationLatLng != null) {
+
             val i = Intent(this, TripInfoActivity::class.java)
             i.putExtra("origin", originName)
             i.putExtra("destination", destinationName)
-            i.putExtra("origin_lat", originLatLng?.latitude)
+            i.putExtra("origin_lat", myLocationLatLng?.latitude)
+            i.putExtra("origin_lng", myLocationLatLng?.longitude)
+            //i.putExtra("origin_lat", originLatLng?.latitude)
             i.putExtra("origin_lng", originLatLng?.longitude)
             i.putExtra("destination_lat", destinationLatLng?.latitude)
             i.putExtra("destination_lng", destinationLatLng?.longitude)
@@ -388,6 +465,38 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
             }
         }
         return position
+    }
+
+    //ON CAMARA INMOVIL *****YO******
+    private fun onCameraMoveNo() {
+
+        if (myLocationLatLng!=null){
+            googleMap?.moveCamera(
+                CameraUpdateFactory.newCameraPosition(
+                    CameraPosition.builder().target(myLocationLatLng!!).zoom(13f).build()
+                ))
+        }
+        googleMap?.setOnCameraIdleListener {
+            try {
+                val geocoder = Geocoder(this)
+                originLatLng = googleMap?.cameraPosition?.target
+
+                if (myLocationLatLng != null) {
+                    val addressList = geocoder.getFromLocation(myLocationLatLng?.latitude!!, myLocationLatLng?.longitude!!, 1)
+                    if (addressList.size > 0) {
+                        val city = addressList[0].locality
+                        val country = addressList[0].countryName
+                        val address = addressList[0].getAddressLine(0)
+                        originName = "$address $city"
+                        autocompleteOrigin?.setText("$address $city")
+                    }
+                }
+
+            } catch (e: Exception) {
+                Log.d("ERROR", "Mensaje error: ${e.message}")
+            }
+        }
+
     }
 
         //POSICION DE LA CAMARA
@@ -473,7 +582,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
                 Place.Field.ADDRESS,
             )
         )
-        autocompleteDestination?.setHint("Destino")
+        autocompleteDestination?.setHint("Indique el Destino")
         autocompleteDestination?.setCountry("VE")
 
 
@@ -506,7 +615,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     override fun onMapReady(map: GoogleMap) {
         googleMap = map
         googleMap?.uiSettings?.isZoomControlsEnabled = true
-        onCameraMove()
+        onCameraMoveNo()
 //        easyWayLocation?.startLocation();
 
         if (ActivityCompat.checkSelfPermission(
@@ -520,7 +629,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
 
             return
         }
-        googleMap?.isMyLocationEnabled = false
+        googleMap?.isMyLocationEnabled = true
 
         try {
             val success = googleMap?.setMapStyle(
@@ -541,6 +650,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     }
 
     override fun currentLocation(location: Location) { // ACTUALIZACION DE LA POSICION EN TIEMPO REAL
+        Log.d("MAPAS", "VALOS DE myLocationLatLng: ${myLocationLatLng}")
         myLocationLatLng = LatLng(location.latitude, location.longitude) // LAT Y LONG DE LA POSICION ACTUAL
 
         if (!isLocationEnabled) { // UNA SOLA VEZ

@@ -1,6 +1,7 @@
 package com.carlosvicente.uberkotlin.activities
 
 import android.Manifest
+import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Resources
@@ -19,8 +20,10 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.bumptech.glide.Glide
 import com.example.easywaylocation.EasyWayLocation
 import com.example.easywaylocation.Listener
 import com.example.easywaylocation.draw_path.DirectionUtil
@@ -46,6 +49,7 @@ import com.carlosvicente.uberkotlin.providers.DriverProvider
 import com.carlosvicente.uberkotlin.providers.GeoProvider
 import com.carlosvicente.uberkotlin.utils.CarMoveAnim
 import org.imperiumlabs.geofirestore.extension.getLocation
+import kotlin.math.log
 
 class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, DirectionUtil.DirectionCallBack {
 
@@ -61,6 +65,7 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
     private var destinationLatLng: LatLng? = null
     private var booking: Booking? = null
     private var markerOrigin: Marker? = null
+    private var markerOriginFoto: Marker? = null
     private var bookingListener: ListenerRegistration? = null
     private lateinit var binding: ActivityMapTripBinding
     private var googleMap: GoogleMap? = null
@@ -70,6 +75,8 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
     private val geoProvider = GeoProvider()
     private val authProvider = AuthProvider()
     private val bookingProvider = BookingProvider()
+
+    private var driver: Driver? = null
 
 
     private var wayPoints: ArrayList<LatLng> = ArrayList()
@@ -84,6 +91,8 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
     val origin: String? = null
     private var isMoto = false
     private val driverProvider = DriverProvider()
+    private var extraTipo = ""
+
 
     private var modalTrip = ModalBottomSheetTripInfo()
 
@@ -106,8 +115,11 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
         easyWayLocation = EasyWayLocation(this, locationRequest, false, false, this)
 
         binding.imageViewInfo.setOnClickListener { showModalInfo() }
+        binding.floatInfo.setOnClickListener{showModalInfo()}
 
-
+        //RECIBE EL TIPO DE VEHICULO DE LA SEARCHACTIVITY**************
+        extraTipo = intent.getStringExtra("tipo")!!
+        Log.d("TIPOV", "VALOR DE EXTRATIPO TRAIDA PANTALLA SEARCHA:= $extraTipo")
         locationPermissions.launch(arrayOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION
@@ -136,17 +148,50 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
 
     }
 
+
+    //MENSAGE DE CONFIRMACION DE SALIDA*********************
+
+    fun salirdelApp(){
+
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Salir")
+        builder.setMessage("Desea salir de la pantalla de navegacion?")
+        builder.setPositiveButton("Salir", DialogInterface.OnClickListener { dialog, which ->
+
+            goToMap()
+        })
+        builder.setNegativeButton("Cancelar",null )
+        builder.show()
+
+    }
+    private fun goToMap() {
+        val i = Intent(this, MapActivity::class.java)
+        i.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(i)
+    }
+
+
     private fun showModalInfo() {
         if (booking != null) {
             val bundle = Bundle()
             bundle.putString("booking", booking?.toJson())
             modalTrip.arguments = bundle
+            //VERIFICA QUE ESTE EN UNA ACTIVIDAD VALIDA
+
+
             modalTrip.show(supportFragmentManager, ModalBottomSheetTripInfo.TAG)
+
+
+
+
+            ///******   ***************************
+
         }
         else {
             Toast.makeText(this, "No se pudo cargar la informacion", Toast.LENGTH_SHORT).show()
         }
     }
+
 
 // VERIFICA LA LOCALIZACION DEL CONDUCTOR ****************
     private fun getLocationDriver() {
@@ -188,6 +233,7 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
     }
 
 
+        // OBTIENE LOS CAMBIO DEL BOOKING***************
     private fun getBooking() {
         listenerBooking = bookingProvider.getBooking().addSnapshotListener { document, e ->
 
@@ -197,37 +243,41 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
             }
 
             booking = document?.toObject(Booking::class.java)
+            if(booking!=null){
+                Log.d("FIRESTORE", "VALOR DEL BOOKING COMPLETO1: ${booking}")
+                if (!isBookingLoaded) {
+                    Log.d("FIRESTORE", "VALOR DEL BOOKING COMPLETO2: ${booking}")
+                    isBookingLoaded = true
+                    originLatLng = LatLng(booking?.originLat!!, booking?.originLng!!)
+                    destinationLatLng = LatLng(booking?.destinationLat!!, booking?.destinationLng!!)
+                    googleMap?.moveCamera(CameraUpdateFactory.newCameraPosition(
+                        CameraPosition.builder().target(originLatLng!!).zoom(13f).build()// ZOOM DE LA CAMARA AL ENTRAR
+                    ))
+                    getLocationDriver()
+                    addOriginMarker(originLatLng!!)
+                }
 
-            if (!isBookingLoaded) {
-                isBookingLoaded = true
-                originLatLng = LatLng(booking?.originLat!!, booking?.originLng!!)
-                destinationLatLng = LatLng(booking?.destinationLat!!, booking?.destinationLng!!)
-                googleMap?.moveCamera(CameraUpdateFactory.newCameraPosition(
-                    CameraPosition.builder().target(originLatLng!!).zoom(13f).build()// ZOOM DE LA CAMARA AL ENTRAR
-                ))
-                getLocationDriver()
-                addOriginMarker(originLatLng!!)
-            }
+                if (booking?.status == "accept") {
+                    binding.textViewStatus.text = "Aceptado"
+                    binding.textViewStatus.textColors
+                }
+                else if (booking?.status == "started") {
+                    binding.textViewStatus.text = "Iniciado"
 
-            if (booking?.status == "accept") {
-                binding.textViewStatus.text = "Aceptado"
-            }
-            else if (booking?.status == "started") {
-                binding.textViewStatus.text = "Iniciado"
-
-                startTrip()
-            }
-            else if (booking?.status == "finished") {
-                binding.textViewStatus.text = "Finalizado"
-                 finishTrip()
+                    startTrip()
+                }
+                else if (booking?.status == "finished") {
+                    binding.textViewStatus.text = "Finalizado"
+                    finishTrip()
+                }
             }
 
 
         }
     }
-
+// LLAMA AL ACTIVITY CALIFICACION *****************************
     private fun finishTrip() {
-        listenerDriverLocation?.remove()
+        listenerDriverLocation?.remove()//FINALIZA EL LISTENER
         binding.textViewStatus.text = "Finalizado"
         val i = Intent(this, CalificationActivity::class.java)
         i.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -266,19 +316,21 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
     private fun addOriginMarker(position: LatLng) {
         markerOrigin = googleMap?.addMarker(MarkerOptions().position(position).title("Recoger aqui")
             .icon(BitmapDescriptorFactory.fromResource(R.drawable.icons_location_person)))
+
     }
 
+
     private fun addDriverMarker(position: LatLng) {
-        //PARA CAMBIA EL ICONO A UNA MOTO
-        SaberSiesMoto()
-        Log.d("LOCATION", "VARIABLE isMoto $isMoto")
-        if (isMoto== true){
+        //PARA CAMBIA EL ICONO A UNA MOTO**************************
+        //SaberSiesMoto()
+        Log.d("TIPOV", "VARIABLE extraTipo $extraTipo")
+        if (extraTipo== "Moto"){
             markerDriver = googleMap?.addMarker(MarkerOptions().position(position).title("Tu Moto")
-                .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_moto)))
+                .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_motorverde)))
         }
-        if (isMoto== false){
+        if (extraTipo== "Carro"){
             markerDriver = googleMap?.addMarker(MarkerOptions().position(position).title("Tu conductor")
-                .icon(BitmapDescriptorFactory.fromResource(R.drawable.uber_car)))
+                .icon(BitmapDescriptorFactory.fromResource(R.drawable.uber_carverde)))
         }
 
 
@@ -317,6 +369,7 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
         googleMap?.uiSettings?.isZoomControlsEnabled = true
 
         getBooking()
+        //getBookingModi()//MODIFICANDO MEJORA YO************************
 
 //        easyWayLocation?.startLocation();
 
@@ -368,18 +421,21 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
     }
     // VERIFICA SI ES CARRO O MOTO
     private fun SaberSiesMoto(){
-        driverProvider.getDriver(authProvider.getId()).addOnSuccessListener { document ->
-            if (document.exists()) {
-                val driver = document.toObject(Driver::class.java)
+        var extraTipo = "Moto"
 
-                if (driver?.tipo.toString() == "Carro"){
+        Log.d("TIPOV", "Valor de Extratipo:=: $extraTipo")
+                if (extraTipo == "Carro"){
                     isMoto = false
                 }
-                if (driver?.tipo.toString()=="Moto"){
+                if (extraTipo=="Moto"){
                     isMoto = true
                 }
-            }
-        }
+
+    }
+    override fun onBackPressed() {
+        // Aquí puedes colocar el código para manejar la acción del botón "Atrás"
+        // Por ejemplo, puedes finalizar la actividad actual:
+        salirdelApp()
     }
 
 

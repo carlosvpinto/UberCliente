@@ -12,6 +12,7 @@ import com.carlosvicente.uberkotlin.databinding.ActivityCalificationBinding
 import com.carlosvicente.uberkotlin.databinding.ActivityMapTripBinding
 import com.carlosvicente.uberkotlin.models.History
 import com.carlosvicente.uberkotlin.providers.HistoryProvider
+import com.tommasoberlose.progressdialog.ProgressDialogFragment
 
 class CalificationActivity : AppCompatActivity() {
 
@@ -19,7 +20,7 @@ class CalificationActivity : AppCompatActivity() {
     private var historyProvider = HistoryProvider()
     private var calification = 0f
     private var history: History? = null
-
+    private var progressDialog = ProgressDialogFragment
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,6 +28,7 @@ class CalificationActivity : AppCompatActivity() {
         setContentView(binding.root)
         window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
 
+        progressDialog.showProgressBar(this)
         binding.ratingBar.setOnRatingBarChangeListener { ratingBar, value, b ->
             calification = value
         }
@@ -41,6 +43,7 @@ class CalificationActivity : AppCompatActivity() {
         }
 
         getHistory()
+
     }
 
     private fun updateCalification(idDocument: String) {
@@ -73,13 +76,13 @@ class CalificationActivity : AppCompatActivity() {
                     binding.textViewPrice.text = "${String.format("%.1f", history?.price)}$"
                     binding.textViewTimeAndDistance.text = "${history?.time} Min - ${String.format("%.1f", history?.km)} Km"
 
-                    Log.d("FIRESTORE", "hISTORIAL: ${history?.toJson()}")
                 }
                 else {
                     Toast.makeText(this, "No se encontro el historial", Toast.LENGTH_LONG).show()
                 }
 
             }
+            progressDialog.hideProgressBar(this)
         }
     }
 }

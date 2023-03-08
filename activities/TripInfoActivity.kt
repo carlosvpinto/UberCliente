@@ -1,5 +1,6 @@
 package com.carlosvicente.uberkotlin.activities
 
+import android.content.DialogInterface
 import android.content.Intent
 import android.content.res.Resources
 import android.location.Location
@@ -8,6 +9,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import com.example.easywaylocation.EasyWayLocation
 import com.example.easywaylocation.Listener
 import com.example.easywaylocation.draw_path.DirectionUtil
@@ -21,10 +23,12 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.*
 import com.carlosvicente.uberkotlin.R
 import com.carlosvicente.uberkotlin.databinding.ActivityTripInfoBinding
+import com.carlosvicente.uberkotlin.models.Booking
+import com.carlosvicente.uberkotlin.models.Driver
 import com.carlosvicente.uberkotlin.models.Prices
-import com.carlosvicente.uberkotlin.providers.ConfigProvider
-import com.carlosvicente.uberkotlin.providers.GeoProvider
-
+import com.carlosvicente.uberkotlin.providers.*
+import com.google.firebase.firestore.ListenerRegistration
+import com.tommasoberlose.progressdialog.ProgressDialogFragment
 
 
 //import com.carlosvicente.uberkotlin.models.Prices
@@ -35,6 +39,17 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
     private lateinit var binding: ActivityTripInfoBinding
     private var googleMap: GoogleMap? = null
     private var easyWayLocation: EasyWayLocation? = null
+
+    //PARA VERIFICAR SI TIENE BOOKING ACTIVO
+    private val bookingProvider = BookingProvider()
+    private var listenerBooking: ListenerRegistration? = null
+    private var booking: Booking? = null
+    private var isBookingLoaded = false
+    private var activo = "true"
+    private var extraTipo = ""
+    private val driverProvider = DriverProvider()
+    private var driver: Driver? = null
+    private val authProvider = AuthProvider()
 
     private var extraOriginName = ""
     private var extraDestinationName = ""
@@ -56,6 +71,8 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
     var time = 0.0
     var total = 0.0
 
+    private var progressDialog = ProgressDialogFragment
+
     //CARRO O MOTO
     private var tipoVehiculo = ""
     private val geoProvider = GeoProvider()
@@ -66,8 +83,9 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
         super.onCreate(savedInstanceState)
         binding = ActivityTripInfoBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
 
+        window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+        progressDialog.showProgressBar(this)
         // EXTRAS
         extraOriginName = intent.getStringExtra("origin")!!
         extraDestinationName = intent.getStringExtra("destination")!!
@@ -79,6 +97,9 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
         originLatLng = LatLng(extraOriginLat, extraOriginLng)
         destinationLatLng = LatLng(extraDestinationLat, extraDestinationLng)
 
+        Log.d("CAMPO", "VALOr: extraOriginName: $extraOriginName extraDestinationName: $extraDestinationName extraOriginLat ${extraOriginLat} extraOriginLng ${extraOriginLng}")
+        Log.d("CAMPO", "VALOR: extraDestinationLat: $extraDestinationLat extraDestinationLng: $extraDestinationLng tipoVehiculo ${tipoVehiculo} originLatLng ${originLatLng}  destinationLatLng $destinationLatLng")
+
         val mapFragment = supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
 
@@ -89,20 +110,28 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
             smallestDisplacement = 1f
         }
 
+
         easyWayLocation = EasyWayLocation(this, locationRequest, false, false, this)
+        Log.d("CAMPO", "VALOR2: easyWayLocation: $easyWayLocation y locationRequest: $locationRequest")
+        Log.d("CAMPO", "VALOR3: extraOriginName: $extraOriginName  Y extraDestinationName: $extraDestinationName")
 
         binding.textViewOrigin.text = extraOriginName
         binding.textViewDestination.text = extraDestinationName
 
 
         binding.imageViewBack.setOnClickListener { finish() }
-        binding.btnConfirmRequest.setOnClickListener { goToSearchDriver() }
+        binding.btnConfirmRequest.setOnClickListener { goToSearchDriver()}
+
     }
+
+
+
 
     private fun goToSearchDriver() {
 
         if (originLatLng != null && destinationLatLng != null) {
             val i = Intent(this, SearchActivity::class.java)
+            i.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             i.putExtra("origin", extraOriginName)
             i.putExtra("destination", extraDestinationName)
             i.putExtra("origin_lat", originLatLng?.latitude)
@@ -130,7 +159,7 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
                 var CmediaMoto = prices?.CmediaMoto
                 val CcortaCarro = prices?.CcortaCarro
                 val CmediaCarro = prices?.CMediaCarro
-                val kmCarro = prices?.km
+                val kmCarro = prices?.kmCarro
                 val kmMoto = prices?.kmMoto
 
                 if (tipoVehiculo == "Carro"){
@@ -138,30 +167,33 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
                     if (distance<5) {
                         total = CcortaCarro!!.toDouble()
                     }
-                    if (distance>5 && distance<12){
+                    if (distance>5 && distance<7){
                         total = CmediaCarro!!.toDouble()
                     }
-                    if (distance>12){ // FALTA CALCULAR BIEN DESPUES DE 12KM
-                        total = distance*kmCarro!!.toDouble()
+                    if (distance>7 ){ // FALTA CALCULAR BIEN DESPUES DE 12KM
+                        total =  CmediaCarro!!.toDouble()+ (distance-7)*kmCarro!!.toDouble()
                     }
+
                 }
 
                 if (tipoVehiculo == "Moto"){
                     if (distance<5) {
                         total = CcortaMoto!!.toDouble()
                     }
-                    if (distance>5 && distance<12){
+                    if (distance>5 && distance<8){
                         total = CmediaMoto!!.toDouble()
                     }
-                    if (distance>12){ // FALTA CALCULAR BIEN DESPUES DE 12KM
-                        total = distance*kmMoto!!.toDouble()
+                    if (distance>7){ // FALTA CALCULAR BIEN DESPUES DE 12KM
+                        total =  CcortaMoto!!.toDouble() + (distance-7)*kmMoto!!.toDouble()
                     }
 
                 }
                 Log.d("PRICE", "VALOS FINAL DE TOTAL: $total ")
                 val minTotalString = String.format("%.1f", total)
                 //  val maxTotalString = String.format("%.1f", maxTotal)
-                binding.textViewPrice.text = "$total$"
+                binding.textViewPrice.text = "$minTotalString$"
+
+                progressDialog.hideProgressBar(this)
             }
 
         }
@@ -177,6 +209,7 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
     private fun addDestinationMarker() {
         markerDestination = googleMap?.addMarker(MarkerOptions().position(destinationLatLng!!).title("LLegada")
             .icon(BitmapDescriptorFactory.fromResource(R.drawable.icons_pin)))
+
     }
 
     private fun easyDrawRoute() {
@@ -188,22 +221,24 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
             .setWayPoints(wayPoints)
             .setGoogleMap(googleMap!!)
             .setPolyLinePrimaryColor(R.color.green)
-            .setPolyLineWidth(25)
+            .setPolyLineWidth(15)
             .setPathAnimation(true)
             .setCallback(this)
             .setDestination(destinationLatLng!!)
             .build()
 
         directionUtil.initPath()
+
     }
 
     override fun onMapReady(map: GoogleMap) {
         googleMap = map
         googleMap?.uiSettings?.isZoomControlsEnabled = true
+
 // ACTIVA LA POSCION DE LA CAMARA (YO)
         googleMap?.moveCamera(
             CameraUpdateFactory.newCameraPosition(
-                CameraPosition.builder().target(originLatLng!!).zoom(13f).build()
+                CameraPosition.builder().target(originLatLng!!).zoom(12f).build()
             ))
         easyDrawRoute()
         addOriginMarker()
@@ -257,6 +292,21 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
         getPrices(distance, time)
         binding.textViewTimeAndDistance.text = "$timeString mins - $distanceString km"
 
-        directionUtil.drawPath(WAY_POINT_TAG)
+
+    trazarlinea()
+
+
+
+    }
+    private fun trazarlinea (){
+
+        try {
+            // Código que puede generar una excepción
+            directionUtil.drawPath(WAY_POINT_TAG);
+        } catch (e: NullPointerException) {
+            Toast.makeText(this, "Error locacion $e", Toast.LENGTH_LONG).show()
+            Log.d("CAMPO", "VALOR Null: NullPointerException: $e")
+            return
+        }
     }
 }
