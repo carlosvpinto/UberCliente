@@ -431,6 +431,8 @@ class SearchActivity : AppCompatActivity() {
                 }
                 binding.txtNombreConductor.text=driver?.name.toString()
                 activartiempo()
+                sendNotification()
+                createSolicitudes(authProvider.getId() )
                 //*************************************************
 
             }
@@ -586,7 +588,7 @@ class SearchActivity : AppCompatActivity() {
 
                               suichePrioridad= false
                               createBooking(documentID)
-                              createSolicitudes(authProvider.getId() )
+                              //createSolicitudes(authProvider.getId() )
 
                           }
 
@@ -603,7 +605,7 @@ class SearchActivity : AppCompatActivity() {
                                 suichePrioridad = false
                                 //CREA EL BOOKING EN ESTADO CREADO
                                 createBooking(documentID)
-                                createSolicitudes(authProvider.getId() )
+                              //  createSolicitudes(authProvider.getId() )
                             }
 
                         }

@@ -52,6 +52,7 @@ class ProfileActivity : AppCompatActivity() {
         val lastname = binding.textFieldLastname.text.toString()
         val phone = binding.textFieldPhone.text.toString()
 
+
         val client = Client(
             id = authProvider.getId(),
             name = name,
@@ -67,7 +68,7 @@ class ProfileActivity : AppCompatActivity() {
 
                     clientProvider.update(client).addOnCompleteListener {
                         if (it.isSuccessful) {
-
+                            progressDialog.hideProgressBar(this)
                             Toast.makeText(this@ProfileActivity, "Datos actualizados correctamente", Toast.LENGTH_LONG).show()
                         }
                         else {

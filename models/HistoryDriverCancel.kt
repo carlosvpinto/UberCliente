@@ -19,6 +19,7 @@ data class HistoryDriverCancel (
     val price: Double? = null,
     val timestamp: Long? = null,
     val causa: String? = null,
+    val causaConductor: String?= null,
     val fecha: Date? = null,
 ) {
     public fun toJson() = klaxon.toJsonString(this)

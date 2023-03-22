@@ -48,6 +48,7 @@ import com.carlosvicente.uberkotlin.providers.BookingProvider
 import com.carlosvicente.uberkotlin.providers.DriverProvider
 import com.carlosvicente.uberkotlin.providers.GeoProvider
 import com.carlosvicente.uberkotlin.utils.CarMoveAnim
+import com.tommasoberlose.progressdialog.ProgressDialogFragment
 import org.imperiumlabs.geofirestore.extension.getLocation
 import kotlin.math.log
 
@@ -60,6 +61,7 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
     private var startLatLng: LatLng? = null
 
     private var listenerBooking: ListenerRegistration? = null
+    private var progressDialog = ProgressDialogFragment
     private var markerDestination: Marker? = null
     private var originLatLng: LatLng? = null
     private var destinationLatLng: LatLng? = null
@@ -115,7 +117,9 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
         easyWayLocation = EasyWayLocation(this, locationRequest, false, false, this)
 
         binding.imageViewInfo.setOnClickListener { showModalInfo() }
-        binding.floatInfo.setOnClickListener{showModalInfo()}
+        binding.floatInfo.setOnClickListener{
+            binding.floatInfo.isClickable= false
+            showModalInfo()}
 
         //RECIBE EL TIPO DE VEHICULO DE LA SEARCHACTIVITY**************
         extraTipo = intent.getStringExtra("tipo")!!
@@ -172,13 +176,14 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
 
 
     private fun showModalInfo() {
+
         if (booking != null) {
             val bundle = Bundle()
             bundle.putString("booking", booking?.toJson())
             modalTrip.arguments = bundle
             //VERIFICA QUE ESTE EN UNA ACTIVIDAD VALIDA
 
-
+            binding.floatInfo.isClickable= true
             modalTrip.show(supportFragmentManager, ModalBottomSheetTripInfo.TAG)
 
 
@@ -188,6 +193,7 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
 
         }
         else {
+
             Toast.makeText(this, "No se pudo cargar la informacion", Toast.LENGTH_SHORT).show()
         }
     }
