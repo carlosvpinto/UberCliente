@@ -12,25 +12,34 @@ import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.bumptech.glide.Glide
 import com.carlosvicente.uberkotlin.R
+import com.carlosvicente.uberkotlin.adapters.PagoMovilAdapter
 import com.github.dhaval2404.imagepicker.ImagePicker
 import com.google.protobuf.Empty
 import com.carlosvicente.uberkotlin.databinding.ActivityProfileBinding
 import com.carlosvicente.uberkotlin.models.Client
 import com.carlosvicente.uberkotlin.models.Driver
+import com.carlosvicente.uberkotlin.models.PagoMovil
 import com.carlosvicente.uberkotlin.providers.AuthProvider
 import com.carlosvicente.uberkotlin.providers.ClientProvider
+import com.carlosvicente.uberkotlin.providers.PagoMovilProvider
 import com.tommasoberlose.progressdialog.ProgressDialogFragment
 import java.io.File
 
 class ProfileActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityProfileBinding
-    val clientProvider = ClientProvider()
     val authProvider = AuthProvider()
+    private var pagoMoviles = ArrayList<PagoMovil>()
+    private var pagoMovilProvider = PagoMovilProvider()
+    private val clientProvider = ClientProvider()
 
     private var imageFile: File? = null
 
     private var progressDialog = ProgressDialogFragment
+    private var totalBs = 0.0
+    private var totalDollar= 0.0
+    private var totalSinVeriBs = 0.0
+    private var totalSinVeriBsDollar = 0.0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,6 +49,7 @@ class ProfileActivity : AppCompatActivity() {
 
         progressDialog.showProgressBar(this)
         getClient()
+
         binding.imageViewBack.setOnClickListener { finish() }
         binding.btnUpdate.setOnClickListener { updateInfo() }
         binding.circleImageProfile.setOnClickListener { selectImage() }
@@ -105,6 +115,7 @@ class ProfileActivity : AppCompatActivity() {
                 binding.textFieldLastname.setText(client?.lastname)
                 binding.textFieldPhone.setText(client?.phone)
 
+                totalizaPagos()
                 if (client?.image != null) {
                     if (client.image != "") {
                         Glide.with(this).load(client.image).into(binding.circleImageProfile)
@@ -133,6 +144,57 @@ class ProfileActivity : AppCompatActivity() {
         }
 
     }
+
+    //ACTUALIZA EL EL MONTO EN LA BILLETERA
+    private fun updateBilletera(idDocument: String,totalDolar: Double) {
+        clientProvider.updateBilleteraClient(idDocument, totalDolar).addOnCompleteListener {
+            if (it.isSuccessful) {
+                Log.d("BILLETERA", "totalDollarUpdate: ${totalDolar} ")
+            }
+            else {
+                Log.d("BILLETERA", "FALLO ACTUALIZACION ${totalDolar} ")
+            }
+        }
+    }
+
+
+    private fun totalizaPagos(){
+        pagoMoviles.clear()
+        Log.d("PAGOMOVIL", "getPagosMoviles: ")
+        var total = 0.0
+        pagoMovilProvider.getPagoMovil(authProvider.getId()).get().addOnSuccessListener { query ->
+            Log.d("PAGOMOVIL", "authProviderA: ${authProvider.getId()}")
+            if (query != null) {
+                if (query.documents.size > 0) {
+                    val documents = query.documents
+
+                    for (d in documents) {
+                        var pagoMovil = d.toObject(PagoMovil::class.java)
+                        pagoMovil?.id = d.id
+                        pagoMoviles.add(pagoMovil!!)
+                        if (pagoMovil.verificado != true) {
+                            Log.d("COUNTAR", "ADENTRO ADETRO VERIFICADO FALSE:${pagoMovil.verificado} y $totalDollar ")
+                            totalSinVeriBs += pagoMovil.montoBs!!.toDouble()
+                            totalSinVeriBsDollar += pagoMovil.montoDollar!!.toDouble()
+                        }
+
+                        if (pagoMovil.verificado != false) {
+                            Log.d("COUNTAR", "ADENTRO VERIFICADO TRUE: ${pagoMovil.verificado} y $totalDollar ")
+                            totalBs += pagoMovil.montoBs!!.toDouble()
+                            totalDollar += pagoMovil.montoDollar!!.toDouble()
+                        }
+                    }
+                }
+            }
+            val totalVerdes = totalDollar
+            binding.textFieldWallet.setText(totalVerdes.toString())
+            progressDialog.hideProgressBar(this)
+            updateBilletera(authProvider.getId(),totalVerdes)
+        }
+
+    }
+
+
 
     private fun selectImage() {
         ImagePicker.with(this)

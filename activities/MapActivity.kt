@@ -115,7 +115,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
             smallestDisplacement = 1f
         }
 
-
+        binding.imageViewMenu.isClickable= false
         easyWayLocation = EasyWayLocation(this, locationRequest, false, false, this)
 
         locationPermissions.launch(arrayOf(
@@ -202,13 +202,33 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     private fun createToken() {
         clientProvider.createToken(authProvider.getId())
     }
-
     private fun showModalMenu() {
-        if (!modalMenu.isAdded()) {
-                modalMenu.show(supportFragmentManager, ModalBottomSheetMenu.TAG)
+        val fragmentManager = supportFragmentManager
+        val existingFragment = fragmentManager.findFragmentByTag(ModalBottomSheetMenu.TAG)
+        if (existingFragment != null) {
+            // Si el fragmento ya existe, no lo agregues de nuevo
+            return
         }
-
+        val fragmentTransaction = fragmentManager.beginTransaction()
+        modalMenu.show(fragmentTransaction, ModalBottomSheetMenu.TAG)
     }
+
+
+    //version vieja 2
+//    private fun showModalMenu() {
+//        val fragment = supportFragmentManager.findFragmentByTag(ModalBottomSheetMenu.TAG)
+//        if (fragment == null || !fragment.isVisible) {
+//            modalMenu.show(supportFragmentManager, ModalBottomSheetMenu.TAG)
+//        }
+//    }
+
+    //Version Vieja de llamado al fragment
+//    private fun showModalMenu() {
+//        if (!modalMenu.isAdded()) {
+//                modalMenu.show(supportFragmentManager, ModalBottomSheetMenu.TAG)
+//        }
+//
+//    }
 
     private fun removeBooking() {
 
@@ -430,9 +450,15 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
             i.putExtra("origin_lat", myLocationLatLng?.latitude)
             i.putExtra("origin_lng", myLocationLatLng?.longitude)
             //i.putExtra("origin_lat", originLatLng?.latitude)
-            i.putExtra("origin_lng", originLatLng?.longitude)
-            i.putExtra("destination_lat", destinationLatLng?.latitude)
+            //i.putExtra("origin_lng", originLatLng?.longitude)
+            i.putExtra("destination_lat", destinationLatLng?.latitude!!.toDouble())
+            Log.d("PLACES", "origin_lat PUTEXTRA: ${ myLocationLatLng?.latitude} ")
+            Log.d("PLACES", "origin_lng PUTEXTRA: ${myLocationLatLng?.longitude} ")
+            Log.d("PLACES", "destination_lat PUTEXTRA: ${destinationLatLng?.latitude} ")
+            Log.d("PLACES", "destination_lng PUTEXTRA: ${destinationLatLng?.longitude} ")
+            //i.putExtra("destination_lat", 7.266676999999999)//VALOR FIJO PARA VERIFICAR ERROR
             i.putExtra("destination_lng", destinationLatLng?.longitude)
+            //i.putExtra("destination_lng",-67.4777257)
             i.putExtra("tipo", "Carro")
             startActivity(i)
         }
@@ -467,40 +493,10 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
         return position
     }
 
-    //ON CAMARA INMOVIL *****YO******
-    private fun onCameraMoveNo() {
 
-        if (myLocationLatLng!=null){
-            googleMap?.moveCamera(
-                CameraUpdateFactory.newCameraPosition(
-                    CameraPosition.builder().target(myLocationLatLng!!).zoom(13f).build()
-                ))
-        }
-        googleMap?.setOnCameraIdleListener {
-            try {
-                val geocoder = Geocoder(this)
-                originLatLng = googleMap?.cameraPosition?.target
-
-                if (myLocationLatLng != null) {
-                    val addressList = geocoder.getFromLocation(myLocationLatLng?.latitude!!, myLocationLatLng?.longitude!!, 1)
-                    if (addressList.size > 0) {
-                        val city = addressList[0].locality
-                        val country = addressList[0].countryName
-                        val address = addressList[0].getAddressLine(0)
-                        originName = "$address $city"
-                        autocompleteOrigin?.setText("$address $city")
-                    }
-                }
-
-            } catch (e: Exception) {
-                Log.d("ERROR", "Mensaje error: ${e.message}")
-            }
-        }
-
-    }
 
         //POSICION DE LA CAMARA
-    private fun onCameraMove() {
+    private fun  onCameraMove() {
         googleMap?.setOnCameraIdleListener {
             try {
                 val geocoder = Geocoder(this)
@@ -514,13 +510,42 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
                         val address = addressList[0].getAddressLine(0)
                         originName = "$address $city"
                         autocompleteOrigin?.setText("$address $city")
+                        Log.d("PLACES", "Address onCameraMove ORIGEN: $originName")
+                        Log.d("PLACES", "LAT onCameraMove ORIGEN: ${originLatLng?.latitude}")
+                        Log.d("PLACES", "LNG onCameraMove ORIGEN: ${originLatLng?.longitude}")
                     }
                 }
 
             } catch (e: Exception) {
-                Log.d("ERROR", "Mensaje error: ${e.message}")
+                Log.d("ERROR", "Mensaje error:Listener ${e.message}")
             }
         }
+    }
+    //POSICION DE LA CAMARA
+    private fun  onCameraMove2() {
+
+            try {
+                val geocoder = Geocoder(this)
+                originLatLng = googleMap?.cameraPosition?.target
+
+                if (originLatLng != null) {
+                    val addressList = geocoder.getFromLocation(originLatLng?.latitude!!, originLatLng?.longitude!!, 1)
+                    if (addressList.size > 0) {
+                        val city = addressList[0].locality
+                        val country = addressList[0].countryName
+                        val address = addressList[0].getAddressLine(0)
+                        originName = "$address $city"
+                        autocompleteOrigin?.setText("$address $city")
+                        Log.d("PLACES", "Address onCameraMove ORIGEN: $originName")
+                        Log.d("PLACES", "LAT onCameraMove ORIGEN: ${originLatLng?.latitude}")
+                        Log.d("PLACES", "LNG onCameraMove ORIGEN: ${originLatLng?.longitude}")
+                    }
+                }
+
+            } catch (e: Exception) {
+                Log.d("ERROR", "Mensaje error:Listener ${e.message}")
+            }
+
     }
         //INICIA EL BUSCADOR DE GOOGLE
     private fun startGooglePlaces() {
@@ -556,14 +581,16 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
         autocompleteOrigin?.setHint("Lugar de recogida")
         autocompleteOrigin?.setCountry("VE")
 
-
+        Log.d("PLACES", "Address ORIGEN:afuera $originName")
+        Log.d("PLACES", "LAT ORIGEN:afuera ${originLatLng?.latitude}")
+        Log.d("PLACES", "LNG ORIGEN:afuera ${originLatLng?.longitude}")
         autocompleteOrigin?.setOnPlaceSelectedListener(object: PlaceSelectionListener {
             override fun onPlaceSelected(place: Place) {
                 originName = place.name!!
                 originLatLng = place.latLng
-                Log.d("PLACES", "Address: $originName")
-                Log.d("PLACES", "LAT: ${originLatLng?.latitude}")
-                Log.d("PLACES", "LNG: ${originLatLng?.longitude}")
+                Log.d("PLACES", "Address ORIGEN: $originName")
+                Log.d("PLACES", "LAT ORIGEN: ${originLatLng?.latitude}")
+                Log.d("PLACES", "LNG ORIGEN: ${originLatLng?.longitude}")
             }
 
             override fun onError(p0: Status) {
@@ -584,17 +611,16 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
         )
         autocompleteDestination?.setHint("Indique el Destino")
         autocompleteDestination?.setCountry("VE")
-
-
-
         autocompleteDestination?.setOnPlaceSelectedListener(object: PlaceSelectionListener {
 
             override fun onPlaceSelected(place: Place) {
                 destinationName = place.name!!
                 destinationLatLng = place.latLng
-                Log.d("PLACES", "Address: $destinationName")
-                Log.d("PLACES", "LAT: ${destinationLatLng?.latitude}")
-                Log.d("PLACES", "LNG: ${destinationLatLng?.longitude}")
+
+                Log.d("PLACES", "Address DESTINO: $destinationName")
+                Log.d("PLACES", "LAT DESTINO: ${destinationLatLng?.latitude}")
+                Log.d("PLACES", "LNG DESTINO: ${destinationLatLng?.longitude}")
+                Log.d("PLACES", "place.latLng DESTINO: ${place.latLng}")
             }
 
             override fun onError(p0: Status) {
@@ -615,8 +641,8 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     override fun onMapReady(map: GoogleMap) {
         googleMap = map
         googleMap?.uiSettings?.isZoomControlsEnabled = true
-        onCameraMoveNo()
-//        easyWayLocation?.startLocation();
+        onCameraMove2() // para evitar que se muevan los datos al mover la pantalla
+        //easyWayLocation?.startLocation();
 
         if (ActivityCompat.checkSelfPermission(
                 this,
@@ -630,6 +656,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
             return
         }
         googleMap?.isMyLocationEnabled = true
+        binding.imageViewMenu.isClickable = true
 
         try {
             val success = googleMap?.setMapStyle(
@@ -653,10 +680,12 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
         Log.d("MAPAS", "VALOS DE myLocationLatLng: ${myLocationLatLng}")
         myLocationLatLng = LatLng(location.latitude, location.longitude) // LAT Y LONG DE LA POSICION ACTUAL
 
+
+
         if (!isLocationEnabled) { // UNA SOLA VEZ
             isLocationEnabled = true
             googleMap?.moveCamera(CameraUpdateFactory.newCameraPosition(
-                CameraPosition.builder().target(myLocationLatLng!!).zoom(14f).build()
+                CameraPosition.builder().target(myLocationLatLng!!).zoom(13f).build()
             ))
             getNearbyDrivers()
             getNearbyDriversMoto()
@@ -667,6 +696,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     override fun locationCancelled() {
 
     }
+
 
 
 }

@@ -115,10 +115,16 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
         }
 
         easyWayLocation = EasyWayLocation(this, locationRequest, false, false, this)
+        easyWayLocation?.startLocation()
 
-        binding.imageViewInfo.setOnClickListener { showModalInfo() }
+        binding.imageViewInfo.setOnClickListener {
+            binding.floatInfo.isClickable = false
+            binding.imageViewInfo.isClickable = false
+            showModalInfo() }
         binding.floatInfo.setOnClickListener{
-            binding.floatInfo.isClickable= false
+            binding.floatInfo.isClickable = false
+            binding.imageViewInfo.isClickable = false
+
             showModalInfo()}
 
         //RECIBE EL TIPO DE VEHICULO DE LA SEARCHACTIVITY**************
@@ -177,24 +183,29 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
 
     private fun showModalInfo() {
 
-        if (booking != null) {
-            val bundle = Bundle()
-            bundle.putString("booking", booking?.toJson())
-            modalTrip.arguments = bundle
-            //VERIFICA QUE ESTE EN UNA ACTIVIDAD VALIDA
 
-            binding.floatInfo.isClickable= true
-            modalTrip.show(supportFragmentManager, ModalBottomSheetTripInfo.TAG)
+            if (booking != null) {
+                val bundle = Bundle()
+                bundle.putString("booking", booking?.toJson())
+                binding.floatInfo.isClickable = true
+                binding.imageViewInfo.isClickable = true
+                if (!modalTrip.isAdded) { // Verifica si el fragmento ya está agregado
+                modalTrip.arguments = bundle
+                //VERIFICA QUE ESTE EN UNA ACTIVIDAD VALIDA
 
 
+                modalTrip.show(supportFragmentManager, ModalBottomSheetTripInfo.TAG)
 
 
-            ///******   ***************************
+                ///******   ***************************
 
-        }
-        else {
+            } else {
+                    Toast.makeText(this, "Por favor espera que cargue la Informacion", Toast.LENGTH_SHORT)
+                        .show()
 
-            Toast.makeText(this, "No se pudo cargar la informacion", Toast.LENGTH_SHORT).show()
+            }
+        }else {
+                Toast.makeText(this, "No se pudo cargar la informacion", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -366,6 +377,7 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
 
     override fun onDestroy() { // CIERRA APLICACION O PASAMOS A OTRA ACTIVITY
         super.onDestroy()
+        easyWayLocation?.endUpdates()
         listenerBooking?.remove()
         listenerDriverLocation?.remove()
     }
@@ -377,7 +389,7 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
         getBooking()
         //getBookingModi()//MODIFICANDO MEJORA YO************************
 
-//        easyWayLocation?.startLocation();
+        easyWayLocation?.startLocation();
 
         if (ActivityCompat.checkSelfPermission(
                 this,
@@ -412,7 +424,11 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
     }
 
     override fun currentLocation(location: Location) { // ACTUALIZACION DE LA POSICION EN TIEMPO REAL
-
+        ///PARA ACTUALIZAR POSOSCION 8-4-23
+//        bookingProvider.updatePosicion(authProvider.getId(), location.latitude,location.longitude).addOnCompleteListener {
+//
+//            Log.d("POSISIONREAL", "ACTUALIZACION DE DE LA POSICION DEL BOOKIN ${location.latitude} Y ${location.longitude} ")//CREA HISTORIA DE BOOKING CANCELADOS*******************
+//        }
     }
 
     override fun locationCancelled() {
@@ -442,6 +458,8 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
         // Aquí puedes colocar el código para manejar la acción del botón "Atrás"
         // Por ejemplo, puedes finalizar la actividad actual:
         salirdelApp()
+        easyWayLocation?.endUpdates()
+        listenerBooking?.remove()
     }
 
 

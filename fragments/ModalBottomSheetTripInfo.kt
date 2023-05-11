@@ -19,12 +19,14 @@ import com.carlosvicente.uberkotlin.models.Booking
 import com.carlosvicente.uberkotlin.models.Driver
 import com.carlosvicente.uberkotlin.providers.*
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.tommasoberlose.progressdialog.ProgressDialogFragment
 import de.hdodenhof.circleimageview.CircleImageView
 
 class ModalBottomSheetTripInfo: BottomSheetDialogFragment() {
 
     private var driver: Driver? = null
     private lateinit var booking: Booking
+    private var progressDialog = ProgressDialogFragment
     val driverProvider = DriverProvider()
     val authProvider = AuthProvider()
     var textViewClientName: TextView? = null
@@ -33,6 +35,7 @@ class ModalBottomSheetTripInfo: BottomSheetDialogFragment() {
     var imageViewPhone: ImageView? = null
     var circleImageClient: CircleImageView? = null
     var circleImageWhatsaap: CircleImageView? = null
+
 
     val REQUEST_PHONE_CALL = 30
 
@@ -52,6 +55,7 @@ class ModalBottomSheetTripInfo: BottomSheetDialogFragment() {
         circleImageWhatsaap = view.findViewById(R.id.logowhatsapp)
 
 //        getDriver()
+        progressDialog.showProgressBar(requireActivity())
         val data = arguments?.getString("booking")
         booking = Booking.fromJson(data!!)!!
 
@@ -151,15 +155,13 @@ class ModalBottomSheetTripInfo: BottomSheetDialogFragment() {
             if (document.exists()) {
                 driver = document.toObject(Driver::class.java)
                 textViewClientName?.text = "${driver?.name} ${driver?.lastname}"
-
+                progressDialog.hideProgressBar(requireActivity())
                 if (driver?.image != null) {
                     if (driver?.image != "") {
                         Glide.with(requireActivity()).load(driver?.image).into(circleImageClient!!)
                     }
 
-                  //  if (driver?.imageVehiculo!= null){
-                  //      Glide.with(requireActivity()).load(driver?.imageVehiculo).into(circleImageVehiculo!!)
-                  //  }
+                    progressDialog.hideProgressBar(requireActivity())
                 }
             }
         }

@@ -38,6 +38,7 @@ import com.example.easywaylocation.EasyWayLocation
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
+import java.text.DecimalFormat
 import java.util.*
 import kotlin.collections.HashMap
 
@@ -54,6 +55,8 @@ class SearchActivity : AppCompatActivity() {
     private var extraDestinationLng = 0.0
     private var extraTime = 0.0
     private var extraDistance = 0.0
+    private var extratotal = 0.0
+    private var extraTipoDePago = ""
 
     var easyWayLocation: EasyWayLocation? = null
     private var myLocationLatLng: LatLng? = null
@@ -67,10 +70,13 @@ class SearchActivity : AppCompatActivity() {
     private val authProvider = AuthProvider()
     private val clientProvider = ClientProvider()
     private val bookingProvider = BookingProvider()
+    private val pagoMovilProvider = PagoMovilProvider()
+    private val reciboCondutorProvider = ReciboCondutorlProvider()
     private val solicitudesRealiProvider = SolicitudesRealiProvider()
     private val notificationProvider = NotificationProvider()
     private val driverProvider = DriverProvider()
     private val historyCancelProvider = HistoryCancelProvider()
+    private var booking: Booking? = null
 
     private var swTiempo = false
 
@@ -108,6 +114,8 @@ class SearchActivity : AppCompatActivity() {
         window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
 
         // EXTRAS
+        extraTipoDePago = intent.getStringExtra("tipoDepago")!!
+        extratotal = intent.getDoubleExtra("total",0.0)
         extraOriginName = intent.getStringExtra("origin")!!
         extraDestinationName = intent.getStringExtra("destination")!!
         extraOriginLat = intent.getDoubleExtra("origin_lat", 0.0)
@@ -136,10 +144,6 @@ class SearchActivity : AppCompatActivity() {
     //disconnectDriver()
     getClient()//OBTIENE LA INFORMCIONDEL CLIENTE ******* YO *****************
     SaberSiesMoto()
-//    isDriverFound = false
-//    prioridadDisponible= false
-//    suichePrioridad= true
-//    idDriver= ""
     Log.d("prioridad", "INICIANDO BUSQUEDA: IDDRIVER $idDriver")
     //COLOCA LA ANIMACION CORREPONDIENTE A LA BUSQUEDA
     BuscaAnimacion(extraTipo)
@@ -148,7 +152,8 @@ class SearchActivity : AppCompatActivity() {
         getClosestDriver()
     }
     if (isMoto!= false){
-        getClosestDriverMoto()
+        // getClosestDriverMoto() INAVILITADO TEMPORAL HASTA TENER MOTOS ACTIVAS***********************************
+        goToBotonMoto()
     }
     checkIfDriverAccept()
     }
@@ -156,7 +161,7 @@ class SearchActivity : AppCompatActivity() {
 
     // TEMPORORIZADOR DE ESPERA DE RESPUESTA DEL CONDUCTOR********************YO*********
     private fun activartiempo(){
-        countDownTimer = object : CountDownTimer(60000,1000){
+        countDownTimer = object : CountDownTimer(100000,1000){
             override fun onTick(millisUntilFinished: Long) {
                 val segundo = (millisUntilFinished/1000).toInt()
                 binding.txtTiempoNro.text= segundo.toString()
@@ -181,21 +186,21 @@ class SearchActivity : AppCompatActivity() {
         val range = Range()
         range.color = Color.parseColor("#ce0000")
         range.from = 0.0
-        range.to = 15.0
+        range.to = 20.0
 
         val range2 = Range()
         range2.color = Color.parseColor("#E3E500")
-        range2.from = 15.0
-        range2.to = 45.0
+        range2.from = 20.0
+        range2.to = 60.0
 
         val range3 = Range()
         range3.color = Color.parseColor("#00b20b")
-        range3.from = 45.0
-        range3.to = 60.0
+        range3.from = 60.0
+        range3.to = 100.0
 
         binding.fullGauge.minValue = 0.0
-        binding.fullGauge.maxValue = 60.0
-        binding.fullGauge.value = 60.0
+        binding.fullGauge.maxValue = 100.0
+        binding.fullGauge.value = 100.0
 
 
         binding.fullGauge.addRange(range)
@@ -218,25 +223,6 @@ class SearchActivity : AppCompatActivity() {
             binding.imgJsonBuscarMoto.visibility = View.GONE
         }
 
-    }
-
-    // PARA VOLVER HACER LA BUSQUEDA SI EL CONDUCTOR CANCELA
-    private fun vuelveBuscarSiCancela(){
-
-        disconnectDriver()
-        isDriverFound = false
-        //VERIFICA SI ES MOTO O CARRO/////
-        SaberSiesMoto()
-        Log.d("INTENTOS", "isMoto: $isMoto")
-        if (isMoto!= true){
-
-            getClosestDriver()
-        }
-        if (isMoto!= false){
-
-            getClosestDriverMoto()
-        }
-        checkIfDriverAccept()
     }
 
     //DESCONECTA AL CONDUCTOR QUE RECHAZO EL BOOKING
@@ -303,7 +289,7 @@ class SearchActivity : AppCompatActivity() {
             }
 
             if (snapshot != null && snapshot.exists()) {
-                val booking = snapshot.toObject(Booking::class.java)
+                booking = snapshot.toObject(Booking::class.java)
 
                 if (booking?.status == "accept") {
                     Log.d("prioridad", "VALOR DE BOOKING.STATUS: ${booking?.status}")
@@ -313,7 +299,7 @@ class SearchActivity : AppCompatActivity() {
                         swTiempo= true
                         countDownTimer?.cancel()
                     }
-
+                    creaReciboCobro()
                     listenerBooking?.remove()
                     goToMapTrip()
                 }
@@ -330,7 +316,71 @@ class SearchActivity : AppCompatActivity() {
             }
         }
     }
-// ENVIA A LA PANTALLAS MAPTRIPACTIVITY Y ENVIA EL VALOR DEL TIPO DE VEHICULO********
+    //crea recibo de cobro para descortar del saldo
+    private fun creaReciboCobro() {
+
+    val df = DecimalFormat("#.##")
+    val extratotalRedondeado = df.format(extratotal).toDouble()
+
+        if (extraTipoDePago== "Billetera") {
+            val pagoMovil = PagoMovil(
+
+                idClient = authProvider.getId(),
+                nro= "viaje",
+                montoBs = -extratotalRedondeado*25,//ACOMODAR ES TEMPORAL
+                montoDollar = -extratotalRedondeado,
+                fechaPago =Date().toString(),
+                tazaCambiaria = 25.0,
+                timestamp = Date().time,
+                verificado = true,
+                date = Date()
+            )
+            pagoMovilProvider.create(pagoMovil).addOnCompleteListener {
+                if (it.isSuccessful) {
+                    creaReciboConductor()
+                    Toast.makeText(this@SearchActivity, "Saldo Descontado", Toast.LENGTH_LONG).show()
+
+                } else {
+                    Toast.makeText(this@SearchActivity, "Error al Descontar", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
+    }
+
+    //CREA UN RECIBO PARA EL CONDUCTOR QUE ACEPTO LA CARRERA
+    private fun creaReciboConductor() {
+        val df = DecimalFormat("#.##")
+        val extratotalRedondeado = df.format(extratotal).toDouble()
+
+        if (extraTipoDePago== "Billetera") {
+            val reciboConductor = ReciboConductor(
+
+                idClient = authProvider.getId(),
+                idDriver = booking?.idDriver,
+                nro = booking?.id,
+               // montoBs = -extratotalRedondeado*25,//ACOMODAR ES TEMPORAL
+                montoDollar = booking?.price,
+                fechaPago =Date().toString(),
+
+                timestamp = Date().time,
+                verificado = false,
+                date = Date()
+            )
+
+            reciboCondutorProvider.crear(reciboConductor).addOnCompleteListener {
+                if (it.isSuccessful) {
+
+                    Toast.makeText(this@SearchActivity, "Recibo Creado al Conductor", Toast.LENGTH_LONG).show()
+
+                } else {
+                    Toast.makeText(this@SearchActivity, "Error alcrear recibo", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    // ENVIA A LA PANTALLAS MAPTRIPACTIVITY Y ENVIA EL VALOR DEL TIPO DE VEHICULO********
     private fun goToMapTrip() {
         val i = Intent(this, MapTripActivity::class.java)
         if (extraTipo=="Moto"){
@@ -343,6 +393,20 @@ class SearchActivity : AppCompatActivity() {
             startActivity(i)
         }
 
+    }
+
+
+    //PARA MANDAR A BUSCAR CARRO(MOTO) TEMPORAR HASTA TENER MOTOS
+    private fun goToBotonMoto() {
+        val i = Intent(this, MotoTemporalActivity::class.java)
+        i.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        i.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        i.putExtra("origin", extraOriginName)
+        i.putExtra("destination", extraDestinationName)
+
+        //PARA MANDAR A BUSCAR CARRO(MOTO)
+
+        startActivity(i)
     }
 
     private fun goToMap() {
@@ -366,6 +430,7 @@ class SearchActivity : AppCompatActivity() {
             originLng = extraOriginLng,
             destinationLat = extraDestinationLat,
             destinationLng = extraDestinationLng,
+            price = extratotal,
             date= Date()
         )
         bookinglate = booking
@@ -392,7 +457,8 @@ class SearchActivity : AppCompatActivity() {
             image = cliente?.image,
             destination = extraDestinationName,
             origin = extraOriginName,
-            time = extraTime,
+            time = Date().time,
+            price = extratotal,
             km = extraDistance,
             fecha= Date()
         )

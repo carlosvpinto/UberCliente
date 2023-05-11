@@ -47,7 +47,9 @@ class CalificationActivity : AppCompatActivity() {
     }
 
     private fun updateCalification(idDocument: String) {
+        progressDialog.showProgressBar(this)
         historyProvider.updateCalificationToDriver(idDocument, calification).addOnCompleteListener {
+            progressDialog.hideProgressBar(this)
             if (it.isSuccessful) {
                 goToMap()
             }

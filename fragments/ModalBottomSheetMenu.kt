@@ -30,6 +30,7 @@ class ModalBottomSheetMenu: BottomSheetDialogFragment() {
     var linearLayoutProfile: LinearLayout? = null
     var linearLayoutHistory: LinearLayout? = null
     var linearLayoutLlamar: LinearLayout? = null
+    var linearLayoutBank: LinearLayout?=null
     val REQUEST_PHONE_CALL = 30
 
 
@@ -45,15 +46,17 @@ class ModalBottomSheetMenu: BottomSheetDialogFragment() {
         linearLayoutProfile = view.findViewById(R.id.linearLayoutProfile)
         linearLayoutHistory = view.findViewById(R.id.linearLayoutHistory)
         linearLayoutLlamar = view.findViewById(R.id.linearLayoutLlamar)
+        linearLayoutBank = view.findViewById(R.id.linearLayoutBank)
 
         getClient()
 
         linearLayoutLogout?.setOnClickListener { goToMain() }
+        linearLayoutBank?.setOnClickListener { goToBank() }
         linearLayoutProfile?.setOnClickListener { goToProfile() }
         linearLayoutHistory?.setOnClickListener { goToHistories() }
         linearLayoutLlamar?.setOnClickListener {
 
-            val driverTlf = "0584243454032"
+            val driverTlf = "0584124603451"
                 whatSapp(driverTlf)
 
 
@@ -61,6 +64,12 @@ class ModalBottomSheetMenu: BottomSheetDialogFragment() {
         }
         return view
     }
+
+    private fun goToBank() {
+        val i = Intent(activity, BancoprincipalActivity::class.java)
+        startActivity(i)
+    }
+
     //ENVIAR MSJ DE WHATSAPP*******YO******
     private fun whatSapp (phone: String){
         var phone58 = phone
@@ -70,7 +79,7 @@ class ModalBottomSheetMenu: BottomSheetDialogFragment() {
                 // código que puede generar una excepción
                 val phone58 = "058$phone"
                 val i  = Intent(Intent.ACTION_VIEW);
-                val  uri =  "whatsapp://send?phone="+phone+"&text="+"hola te escribo de la apliacion TAXI AHORA:";
+                val  uri =  "whatsapp://send?phone="+phone+"&text="+"hola te escribo de la aplicacion TAXI AHORA:";
                 i.setData(Uri.parse(uri))
                 requireActivity().startActivity(i)
             } catch (e: Exception) {

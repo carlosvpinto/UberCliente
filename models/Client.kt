@@ -12,6 +12,7 @@ data class Client (
     val phone: String? = null,
     var image: String? = null,
     var token: String? = null,
+    var billetera: Double? = null,
 ) {
 
 

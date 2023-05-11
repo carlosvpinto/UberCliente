@@ -56,6 +56,12 @@ class ClientProvider {
         map["token"] = token
         return db.document(idClient).update(map)
     }
+    fun updateBilleteraClient(id: String, monto: Double): Task<Void> {
+        return db.document(id).update("billetera", monto).addOnFailureListener { exception ->
+            Log.d("FIRESTORE", "ERROR: ${exception.message}")
+            Log.d("BILLETERA", "Monto: ${monto}")
+        }
+    }
 
     fun update(client: Client): Task<Void> {
         val map: MutableMap<String, Any> = HashMap()

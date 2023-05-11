@@ -43,6 +43,11 @@ class BookingProvider {
             Log.d("FIRESTORE", "ERROR: ${exception.message}")
         }
     }
+    fun updatePosicion(idClient: String, originLat: Double, originLng:Double): Task<Void> {
+        return db.document(idClient).update("originLat", originLat, "originLng",originLng).addOnFailureListener { exception ->
+            Log.d("FIRESTORE", "ERROR: ${exception.message}")
+        }
+    }
 
 
 

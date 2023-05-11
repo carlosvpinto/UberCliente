@@ -43,7 +43,7 @@ class HistoriesActivity : AppCompatActivity() {
 
         supportActionBar?.title = "Historial de viajes"
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        binding.toolbar.setTitleTextColor(Color.WHITE)
+        binding.toolbar.setTitleTextColor(Color.BLACK)
 
         getHistories()
     }
