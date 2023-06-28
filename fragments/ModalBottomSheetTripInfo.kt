@@ -31,6 +31,9 @@ class ModalBottomSheetTripInfo: BottomSheetDialogFragment() {
     val authProvider = AuthProvider()
     var textViewClientName: TextView? = null
     var textViewOrigin: TextView? = null
+    var textViewTipoPago: TextView? = null
+    var textViewMontoPago: TextView? = null
+
     var textViewDestination: TextView? = null
     var imageViewPhone: ImageView? = null
     var circleImageClient: CircleImageView? = null
@@ -49,6 +52,8 @@ class ModalBottomSheetTripInfo: BottomSheetDialogFragment() {
 
         textViewClientName = view.findViewById(R.id.textViewClientName)
         textViewOrigin = view.findViewById(R.id.textViewOrigin)
+        textViewTipoPago = view.findViewById(R.id.txtTipoPago)
+        textViewMontoPago = view.findViewById(R.id.txtMontopagado)
         textViewDestination = view.findViewById(R.id.textViewDestination)
         imageViewPhone = view.findViewById(R.id.imageViewPhone)
         circleImageClient = view.findViewById(R.id.circleImageClient)
@@ -61,6 +66,8 @@ class ModalBottomSheetTripInfo: BottomSheetDialogFragment() {
 
         textViewOrigin?.text = booking.origin
         textViewDestination?.text = booking.destination
+        textViewTipoPago?.text= booking.tipoPago
+        textViewMontoPago?.text= booking.price.toString()
         circleImageWhatsaap?.setOnClickListener{
             if (driver?.phone!= null){
                 whatSapp(driver?.phone!!)

@@ -75,7 +75,7 @@ class CalificationActivity : AppCompatActivity() {
                     history?.id = query.documents[0].id
                     binding.textViewOrigin.text = history?.origin
                     binding.textViewDestination.text = history?.destination
-                    binding.textViewPrice.text = "${String.format("%.1f", history?.price)}$"
+                    binding.textViewPrice.text = "${String.format("%.2f", history?.price)}$"
                     binding.textViewTimeAndDistance.text = "${history?.time} Min - ${String.format("%.1f", history?.km)} Km"
 
                 }

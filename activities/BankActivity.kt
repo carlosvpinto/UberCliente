@@ -13,26 +13,45 @@ import android.widget.Toast
 import com.carlosvicente.uberkotlin.R
 import com.carlosvicente.uberkotlin.databinding.ActivityBankBinding
 import com.carlosvicente.uberkotlin.databinding.ActivityCalificationBinding
-import com.carlosvicente.uberkotlin.models.Booking
-import com.carlosvicente.uberkotlin.models.FCMBody
-import com.carlosvicente.uberkotlin.models.FCMResponse
-import com.carlosvicente.uberkotlin.models.PagoMovil
-import com.carlosvicente.uberkotlin.providers.AuthProvider
-import com.carlosvicente.uberkotlin.providers.BookingProvider
-import com.carlosvicente.uberkotlin.providers.NotificationProvider
-import com.carlosvicente.uberkotlin.providers.PagoMovilProvider
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
 import java.text.ParseException
 import java.text.SimpleDateFormat
 import java.util.*
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.os.AsyncTask
+import com.carlosvicente.uberkotlin.models.*
+import com.carlosvicente.uberkotlin.providers.*
+import com.google.firebase.firestore.ListenerRegistration
+import com.tommasoberlose.progressdialog.ProgressDialogFragment
+import kotlinx.coroutines.*
+import okhttp3.OkHttpClient
 
+
+
+
+import okhttp3.Request
+import org.jsoup.nodes.Element
+import java.io.IOException
+import java.security.KeyManagementException
+import java.security.NoSuchAlgorithmException
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 
 private lateinit var binding: ActivityBankBinding
 private val authProvider = AuthProvider()
 private val pagoMovilProvider = PagoMovilProvider()
+private val configProvider = ConfigProvider()
+private var configListener: ListenerRegistration? = null
+
+private var progressDialog = ProgressDialogFragment
 
 private val notificationProvider = NotificationProvider()
 private var MontoBs = ""
@@ -44,6 +63,8 @@ class BankActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityBankBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+
 
         binding.btnValidar.setOnClickListener{
             validar()
@@ -60,7 +81,67 @@ class BankActivity : AppCompatActivity() {
         binding.imageViewBack.setOnClickListener {
             goToBancoPrincipal()
         }
+        binding.btnPortaPapelCi.setOnClickListener {
+            copiarCi()
+        }
+        binding.btnPortaPapelTlf.setOnClickListener {
+            copiarTlf()
+        }
+        obtenerBCV()
         validarFecha()
+
+    }
+
+
+
+    private fun obtenerBCV(){
+        progressDialog.showProgressBar(this)
+        configProvider.getPrices().addOnSuccessListener { document ->
+
+            var taza = 0.0
+
+            if (document.exists()) {
+                val prices = document.toObject(Prices::class.java) // DOCUMENTO CON LA INFORMACION
+
+                    taza = prices?.taza!!
+
+                Log.d("PRICE", "VALOS FINAL DE TOTAL: $taza ")
+                val tazaRedondeado = String.format("%.2f", taza)
+                //  val maxTotalString = String.format("%.1f", maxTotal)
+                binding.textTasa.text = "$tazaRedondeado"
+
+                progressDialog.hideProgressBar(this)
+            }
+
+
+        }.addOnFailureListener{
+            Toast.makeText(this, "Problemas de conexion Verifique el acceso a internet", Toast.LENGTH_SHORT).show()
+            return@addOnFailureListener
+        }
+    }
+
+
+    private fun copiarTlf() {
+        copyToClipboard(this, binding.textTlf.text.toString(),"El Telefono")
+    }
+
+    //COPIAR LOS DATOS AL PORTAPEPEL
+    private fun copiarCi() {
+        copyToClipboard(this, binding.textCedula.text.toString(), "La Cedula")
+
+    }
+
+    //FUNCION PARA COPIAR AL PORTA PAPEL
+    fun copyToClipboard(context: Context, text: String, titulo: String) {
+        // Obtener el servicio del portapapeles
+        val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+        // Crear un objeto ClipData para guardar el texto
+        val clipData = ClipData.newPlainText("text", text)
+
+        // Copiar el objeto ClipData al portapapeles
+        clipboardManager.setPrimaryClip(clipData)
+        Toast.makeText(this, "Se a Copiado $titulo", Toast.LENGTH_SHORT).show()
     }
 
     private fun validarFecha() {
@@ -85,29 +166,36 @@ class BankActivity : AppCompatActivity() {
 
 
     }
-
+    //CONVIERTE DE BS A DOLART SEGUN LA TAZA BCV EN EL TXT
     private fun covertir(taza:Double) {
         var montoBs = 0.0
         var montoDollar= 0.0
         montoBs= binding.textViewMonto.text.toString().toDouble()
         montoDollar= montoBs/taza
-        Toast.makeText(this, "Convertor", Toast.LENGTH_SHORT).show()
-        binding.TxtMontoDollar.text = montoDollar.toString()
+       // Toast.makeText(this, "Convertor", Toast.LENGTH_SHORT).show()
+        val valorDolar = montoDollar
+        val valorDoilarRendondeado = String.format("%.2f", valorDolar)
 
-
-
+        binding.TxtMontoDollar.text = valorDoilarRendondeado.toString()
     }
 
-    //CREA LA SOLICITUD DE VIAJE CON ESTATUS "create"
+    //CREA LA EL PAGO MOVIL***************
     private fun createPagomovil() {
+
+        val montoBs = binding.textViewMonto .toString().toDouble()
+        val montoDollar = binding.TxtMontoDollar.toString().toDouble()
+        val montoBRedondeado = String.format("%.2f", montoBs)
+        val montoDollarRedondeado = String.format("%.2f", montoDollar)
+
 
         val pagoMovil = PagoMovil(
 
             idClient = authProvider.getId(),
             nro= binding.text5Ultimos.text.toString(),
-            montoBs = binding.textViewMonto.text.toString().toDouble(),
-            montoDollar = binding.TxtMontoDollar.text.toString().toDouble(),
+            montoBs = montoBRedondeado.toDouble(),
+            montoDollar = montoDollarRedondeado.toDouble(),
             fechaPago = binding.textViewDateFija.text.toString(),
+            tlfPago = binding.textTlf.text.toString(),
             tazaCambiaria = binding.textTasa.text.toString().toDouble(),
             timestamp = Date().time,
             verificado = false,
@@ -130,21 +218,26 @@ class BankActivity : AppCompatActivity() {
     private fun isValidForm(banco: String, monto: String, telefono: String, fecha: String, recibo: String): Boolean {
 
         if (banco.isEmpty()) {
+            binding.textBanco.requestFocus()
             Toast.makeText(this, "Ingresa tu Banco", Toast.LENGTH_SHORT).show()
             return false
         }
 
         if (monto.isEmpty()) {
+            binding.textViewMonto.requestFocus()
             Toast.makeText(this, "Ingresa el Monto", Toast.LENGTH_SHORT).show()
             return false
         }
 
         if (telefono.isEmpty()) {
             Toast.makeText(this, "Ingresa el Telefono", Toast.LENGTH_SHORT).show()
+            // Establecer el foco en el EditText
+            binding.textTlf.requestFocus()
             return false
         }
 
         if (fecha.isEmpty()) {
+            binding.textViewDateFija.requestFocus()
             Toast.makeText(this, "Ingresa la fecha", Toast.LENGTH_SHORT).show()
             return false
         } else {
@@ -168,6 +261,7 @@ class BankActivity : AppCompatActivity() {
         }
 
         if (recibo.isEmpty()) {
+            binding.text5Ultimos.requestFocus()
             Toast.makeText(this, "Ingresa el Nro de Recibo", Toast.LENGTH_SHORT).show()
             return false
         }

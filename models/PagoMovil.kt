@@ -13,6 +13,7 @@ data class PagoMovil (
     val montoBs: Double? = null,
     val montoDollar: Double? = null,
     val fechaPago: String? = null,
+    val tlfPago: String? = null,
     val tazaCambiaria: Double? = null,
     val timestamp: Long? = null,
     val date: Date?= null,

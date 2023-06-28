@@ -22,6 +22,8 @@ data class Booking (
     val destinationLat: Double? = null,
     val destinationLng: Double? = null,
     val price: Double? = null,
+    val priceBs: Double? = null,
+    val tipoPago: String? = null,
     val date: Date? = null,
 
 ) {

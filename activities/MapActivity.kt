@@ -1,6 +1,7 @@
 package com.carlosvicente.uberkotlin.activities
 
 import android.Manifest
+import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,6 +12,11 @@ import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import android.location.Geocoder
 import android.location.Location
+import android.location.LocationManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -27,10 +33,7 @@ import com.carlosvicente.uberkotlin.databinding.ActivityMapBinding
 import com.carlosvicente.uberkotlin.fragments.ModalBottomSheetMenu
 import com.carlosvicente.uberkotlin.models.Booking
 import com.carlosvicente.uberkotlin.models.DriverLocation
-import com.carlosvicente.uberkotlin.providers.AuthProvider
-import com.carlosvicente.uberkotlin.providers.BookingProvider
-import com.carlosvicente.uberkotlin.providers.ClientProvider
-import com.carlosvicente.uberkotlin.providers.GeoProvider
+import com.carlosvicente.uberkotlin.providers.*
 import com.carlosvicente.uberkotlin.utils.CarMoveAnim
 import com.example.easywaylocation.EasyWayLocation
 import com.example.easywaylocation.Listener
@@ -51,7 +54,19 @@ import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.GeoPoint
 import com.google.maps.android.SphericalUtil
+import kotlinx.coroutines.*
 import org.imperiumlabs.geofirestore.callbacks.GeoQueryEventListener
+import org.jsoup.Jsoup
+import java.io.IOException
+import java.security.KeyManagementException
+import java.security.NoSuchAlgorithmException
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
+
 
 class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
 
@@ -64,6 +79,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     private val authProvider = AuthProvider()
     private val clientProvider = ClientProvider()
     private val bookingProvider = BookingProvider()
+    private val configProvider = ConfigProvider()
 
     // GOOGLE PLACES
     private var places: PlacesClient? = null
@@ -90,7 +106,8 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     //PARA VERIFICAR CON GOOGLE
     private lateinit var auth : FirebaseAuth
 
-
+    private lateinit var connectivityManager: ConnectivityManager
+    private lateinit var networkCallback: ConnectivityManager.NetworkCallback
 
 
 
@@ -100,6 +117,10 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
         setContentView(binding.root)
         window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
 
+        //PARA ACTUALIZAR EL PRECIO DEL DOLAR SOLO CUANDO CARGA POR PRIMERA VEZ
+        if(savedInstanceState== null){
+            obtenerPrecioDolar()
+        }
 
         //PARA VERIFICAR CON GOOGLE
         auth = FirebaseAuth.getInstance()
@@ -126,15 +147,104 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
         startGooglePlaces()
         removeBooking()
         createToken()
+        startNetworkMonitoring(this)
         FirebaseAnalytics.getInstance(this)
         binding.btnSolicitarMoto.setOnClickListener { goToTripMotoInfo() }
         binding.btnBuscarCarro.setOnClickListener { goToTripInfo() }
         binding.imageViewMenu.setOnClickListener { showModalMenu() }
         binding.imageViewSalir.setOnClickListener{salirdelApp()}
 
+        disableSSLVerification()
+
 
        // binding.txtposicionActual.setOnClickListener{irPosicionActual()}
     }
+   
+
+
+    //ASINCRONO CORRUTINA BCV*************************
+
+    private fun obtenerPrecioDolar() {
+        CoroutineScope(Dispatchers.IO).launch {
+            var intentos = 0
+            val maxIntentos = 3
+            var obtenido = false
+
+                while (intentos < maxIntentos && !obtenido) {
+                try {
+                    val document = Jsoup.connect("https://www.bcv.org.ve/").timeout(60000).get()
+                    val precioDolar = document.select("#dolar strong").first()?.text()
+                    val valorDolar = precioDolar?.replace(",", ".")?.toDoubleOrNull()
+
+                    withContext(Dispatchers.Main) {
+                        if (valorDolar != null) {
+
+                            PrecioDolarContainer.setPrecioDolar(valorDolar)
+
+                           // actualizarPrecioDolar(valorDolar)
+                            configProvider.updateTaza(valorDolar.toDouble()).addOnCompleteListener{
+                                Toast.makeText(this@MapActivity, "Actualizo Precio BCV $valorDolar", Toast.LENGTH_SHORT).show()
+                            }
+
+                            // Marcar como obtenido y salir del bucle
+                            obtenido = true
+                        } else {
+                            Toast.makeText(this@MapActivity, "Problemas de Internet", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } catch (e: IOException) {
+                    e.printStackTrace()
+                    withContext(Dispatchers.Main) {
+                        //binding.textTasa.text = "Error de conexión"
+                    }
+                }
+                    // Incrementar el contador de intentos
+                    intentos++
+
+                    // Esperar un tiempo antes de realizar el próximo intento
+                    delay(10000) // Esperar 10 segundos antes de volver a intentar obtener el precio del dólar
+            }
+        }
+    }
+
+    //PUBLICO PARA TODO EL PROYECTO
+    object PrecioDolarContainer {
+        private var precioDolar: Double? = null
+
+        fun setPrecioDolar(valor: Double) {
+            precioDolar = valor
+        }
+
+        fun getPrecioDolar(): Double? {
+            return precioDolar
+        }
+    }
+    
+
+    //PARA LA SEGURIDAD*****************
+    fun disableSSLVerification() {
+        try {
+            val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+
+                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+
+                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+            })
+
+            val sslContext = SSLContext.getInstance("TLS")
+            sslContext.init(null, trustAllCerts, SecureRandom())
+
+            HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.socketFactory)
+            HttpsURLConnection.setDefaultHostnameVerifier { _, _ -> true }
+        } catch (e: NoSuchAlgorithmException) {
+            e.printStackTrace()
+        } catch (e: KeyManagementException) {
+            e.printStackTrace()
+        }
+    }
+
+    //**************************************
 
 
     //realizar Google Analytics *****yo**************
@@ -213,22 +323,6 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
         modalMenu.show(fragmentTransaction, ModalBottomSheetMenu.TAG)
     }
 
-
-    //version vieja 2
-//    private fun showModalMenu() {
-//        val fragment = supportFragmentManager.findFragmentByTag(ModalBottomSheetMenu.TAG)
-//        if (fragment == null || !fragment.isVisible) {
-//            modalMenu.show(supportFragmentManager, ModalBottomSheetMenu.TAG)
-//        }
-//    }
-
-    //Version Vieja de llamado al fragment
-//    private fun showModalMenu() {
-//        if (!modalMenu.isAdded()) {
-//                modalMenu.show(supportFragmentManager, ModalBottomSheetMenu.TAG)
-//        }
-//
-//    }
 
     private fun removeBooking() {
 
@@ -521,33 +615,43 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
             }
         }
     }
-    //POSICION DE LA CAMARA
-    private fun  onCameraMove2() {
-
+    //POSICION DE LA CAMARA sin mover el origen del telefono
+    private fun onCameraMove2() {
+        googleMap?.setOnCameraIdleListener {
             try {
                 val geocoder = Geocoder(this)
                 originLatLng = googleMap?.cameraPosition?.target
 
                 if (originLatLng != null) {
-                    val addressList = geocoder.getFromLocation(originLatLng?.latitude!!, originLatLng?.longitude!!, 1)
+                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                        val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                        val location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+
+                        if (location != null) {
+                            originLatLng = LatLng(location.latitude, location.longitude)
+                        }
+                    }
+
+                    val addressList = geocoder.getFromLocation(originLatLng!!.latitude, originLatLng!!.longitude, 1)
+
                     if (addressList.size > 0) {
                         val city = addressList[0].locality
                         val country = addressList[0].countryName
                         val address = addressList[0].getAddressLine(0)
                         originName = "$address $city"
                         autocompleteOrigin?.setText("$address $city")
-                        Log.d("PLACES", "Address onCameraMove ORIGEN: $originName")
-                        Log.d("PLACES", "LAT onCameraMove ORIGEN: ${originLatLng?.latitude}")
-                        Log.d("PLACES", "LNG onCameraMove ORIGEN: ${originLatLng?.longitude}")
+                        Log.d("ORIGENES", "Address onCameraMove ORIGEN: $originName")
+                        Log.d("ORIGENES", "LAT onCameraMove ORIGEN: ${originLatLng!!.latitude}")
+                        Log.d("ORIGENES", "LNG onCameraMove ORIGEN: ${originLatLng!!.longitude}")
                     }
                 }
-
             } catch (e: Exception) {
                 Log.d("ERROR", "Mensaje error:Listener ${e.message}")
             }
-
+        }
     }
-        //INICIA EL BUSCADOR DE GOOGLE
+
+    //INICIA EL BUSCADOR DE GOOGLE
     private fun startGooglePlaces() {
         if (!Places.isInitialized()) {
             Places.initialize(applicationContext, resources.getString(R.string.google_maps_key))
@@ -636,6 +740,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     override fun onDestroy() { // CIERRA APLICACION O PASAMOS A OTRA ACTIVITY
         super.onDestroy()
         easyWayLocation?.endUpdates()
+        stopNetworkMonitoring()
     }
 
     override fun onMapReady(map: GoogleMap) {
@@ -698,5 +803,36 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     }
 
 
+    // Llama a este método para comenzar a monitorear el estado de la red
+    private fun startNetworkMonitoring(context: Context) {
+        connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        val networkRequest = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .build()
+
+        networkCallback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                // La conexión a internet está disponible
+
+                binding.imageViewInternet.setImageResource(R.drawable.ic_internet)
+                Toast.makeText(context, "Conexion a Internet Disponible", Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onLost(network: Network) {
+                // La conexión a internet se perdió
+                binding.imageViewInternet.setImageResource(R.drawable.ic_no_internet_rojo)
+                Toast.makeText(context, "Sin Conexion a Internet ", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        connectivityManager.registerNetworkCallback(networkRequest, networkCallback)
+    }
+
+    // Llama a este método para detener el monitoreo del estado de la red
+    private fun stopNetworkMonitoring() {
+        connectivityManager.unregisterNetworkCallback(networkCallback)
+    }
 
 }

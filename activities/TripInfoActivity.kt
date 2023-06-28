@@ -1,16 +1,20 @@
 package com.carlosvicente.uberkotlin.activities
 
-import android.content.DialogInterface
-import java.time.LocalTime
+
 import android.content.Intent
 import android.content.res.Resources
 import android.location.Location
+import android.media.MediaPlayer.create
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.core.os.bundleOf
+import androidx.fragment.app.add
+import androidx.fragment.app.commit
 import com.example.easywaylocation.EasyWayLocation
 import com.example.easywaylocation.Listener
 import com.example.easywaylocation.draw_path.DirectionUtil
@@ -24,17 +28,22 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.*
 import com.carlosvicente.uberkotlin.R
 import com.carlosvicente.uberkotlin.databinding.ActivityTripInfoBinding
-import com.carlosvicente.uberkotlin.models.Booking
-import com.carlosvicente.uberkotlin.models.Driver
-import com.carlosvicente.uberkotlin.models.PagoMovil
-import com.carlosvicente.uberkotlin.models.Prices
+import com.carlosvicente.uberkotlin.fragments.ModalBottomSheetMenu
+
+import com.carlosvicente.uberkotlin.fragments.VerificacionFragment
+import com.carlosvicente.uberkotlin.fragments.VerificacionFragment.Companion.MONTO_BUNDLE
+import com.carlosvicente.uberkotlin.fragments.VerificacionFragment.Companion.TAZA_BCV
+import com.carlosvicente.uberkotlin.models.*
 import com.carlosvicente.uberkotlin.providers.*
 import com.google.firebase.firestore.ListenerRegistration
 import com.tommasoberlose.progressdialog.ProgressDialogFragment
 
+import java.time.ZoneId
+import java.time.ZonedDateTime
 
-//import com.carlosvicente.uberkotlin.models.Prices
-//import com.carlosvicente.uberkotlin.providers.ConfigProvider
+import android.net.Uri
+
+
 
 class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, DirectionUtil.DirectionCallBack {
 
@@ -43,19 +52,12 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
     private var easyWayLocation: EasyWayLocation? = null
 
     //PARA VERIFICAR SI TIENE BOOKING ACTIVO
-    private val bookingProvider = BookingProvider()
-    private var listenerBooking: ListenerRegistration? = null
-    private var booking: Booking? = null
-    private var isBookingLoaded = false
-    private var activo = "true"
-    private var extraTipo = ""
-    private val driverProvider = DriverProvider()
-    private var driver: Driver? = null
+
     private val authProvider = AuthProvider()
     private var pagoMoviles = ArrayList<PagoMovil>()
     private var pagoMovilProvider = PagoMovilProvider()
     private val clientProvider = ClientProvider()
-    private var totalBs = 0.0
+    private var totalBsVerifi = 0.0
     private var totalDollar= 0.0
     private var totalSinVeriBs = 0.0
     private var totalSinVeriBsDollar = 0.0
@@ -69,6 +71,13 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
     private var extraDestinationLng = 0.0
     private var originLatLng: LatLng? = null
     private var destinationLatLng: LatLng? = null
+    private var totalDepBsFrag: Double? = null
+    private var totalDepDollarFrag: Double? = null
+    private var tlfFragmenFrag: String? = null
+    private var fechaFrag: String? = null
+    private var reci5ultimosFrag: String? = null
+
+
 
     private var wayPoints: ArrayList<LatLng> = ArrayList()
     private val WAY_POINT_TAG = "way_point_tag"
@@ -77,10 +86,12 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
     private var markerOrigin: Marker? = null
     private var markerDestination: Marker? = null
 
-
+    lateinit var txtSaldo: TextView
     var distance = 0.0
     var time = 0.0
-    var total = 0.0
+    var totalDolarConfig = 0.0
+    private var totalbs = 0.0
+    private var tazaBcv = 0.0
 
     private var progressDialog = ProgressDialogFragment
 
@@ -96,6 +107,8 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
         super.onCreate(savedInstanceState)
         binding = ActivityTripInfoBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+
 
         window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
         progressDialog.showProgressBar(this)
@@ -122,7 +135,7 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
             smallestDisplacement = 1f
         }
 
-
+        txtSaldo = findViewById(R.id.txtSaldo)
         easyWayLocation = EasyWayLocation(this, locationRequest, false, false, this)
 
        // binding.textViewOrigin.text = extraOriginName
@@ -132,15 +145,83 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
         binding.imageViewBack.setOnClickListener { finish() }
         binding.btnConfirmRequest.setOnClickListener { goToSearchDriver()}
 
+
+
+        //PARA ACTIVAR Y DESACTIVAR LOS TOOGER***********
+        activarTooger()
+        //***********************************************
+
+
+
+    }
+
+
+
+    //pata abtener la hora real y no del dispositivo
+    private fun obtenerHoraActual(): ZonedDateTime {
+        val zonaHoraria = ZoneId.of("America/Caracas")
+        val horaActual = ZonedDateTime.now(zonaHoraria)
+        return horaActual
+    }
+
+    private fun activarTooger() {
+        binding.togglePMovil.setOnClickListener {
+            if (binding.togglePMovil.isChecked) {
+                binding.toggleEfectivo.isChecked = false  // Desactiva el toggleButton2
+            } else if (!binding.toggleEfectivo.isChecked) {
+                binding.togglePMovil.isChecked = true  // Si toggleButton2 está desactivado, vuelve a activar toggleButton1
+            }
+        }
+
+        binding.toggleEfectivo.setOnClickListener {
+            if (binding.toggleEfectivo.isChecked) {
+                binding.togglePMovil.isChecked = false  // Desactiva el toggleButton1
+            } else if (!binding.togglePMovil.isChecked) {
+                binding.toggleEfectivo.isChecked = true  // Si toggleButton1 está desactivado, vuelve a activar toggleButton2
+            }
+        }
+    }
+
+    //PARA LLAMAR AL FRAGMNET DEL PAGO MOVIL
+    private fun llamarFragmenPagoM() {
+
+        //ERA LA FORMA ANTERIOR DE LLAMARA AL FRAGMENT
+//        val fragment = VerificacionFragment()
+//        val bundle = bundleOf(NRO_RECIBO_BUNDLE to "151515",
+//            MONTO_BUNDLE to total.toString())
+//       supportFragmentManager.commit {
+//           setReorderingAllowed(true)
+//
+//           add<VerificacionFragment>(R.id.fragmentContainer, args = bundle)
+//       }
+        Log.d("Framentando", "VALOR DE tazaBcv SALIENDO DEL ACTIVITY ${tazaBcv} total: $totalDolarConfig ")
+        val bundle = bundleOf( MONTO_BUNDLE to totalDolarConfig.toString(), TAZA_BCV to tazaBcv.toString())
+        val fragment = VerificacionFragment()
+        fragment.arguments = bundle
+        supportFragmentManager.beginTransaction()
+            .add(R.id.fragmentContainer, fragment)
+            .commit()
+
+        //TRAE LOS DATOS DEL FRAGMNET
+        fragment.setOnSumResultListener(object : VerificacionFragment.OnSumResultListener {
+            override fun onSumResult(totalDepBs: Double, totalDepDollar: Double, tlfFragmen: String,fechaFragment : String,reci5ultimosFragment:String ) {
+                totalDepBsFrag= totalDepBs
+                totalDepDollarFrag = totalDepDollar
+                tlfFragmenFrag= tlfFragmen
+                fechaFrag= fechaFragment
+                reci5ultimosFrag=  reci5ultimosFragment
+                Log.d("precioBs", "Traido  del fragment  totalDepBs: $totalDepBs y totalDepDollar $totalDepDollar tlfFragmen $tlfFragmen fechaFragment $fechaFragment reci5ultimosFragment $reci5ultimosFragment ")
+                //binding.txtdepositado.text = "Sum Result: $totalDepBs y totalDepDollar $totalDepDollar"
+            }
+        })
+
     }
 
     //TOTALIZA TODOS LOS RECIBOS DEL CLIENTE
-    private fun totalizaPagos(){
+     fun totalizaPagos(){
         pagoMoviles.clear()
-        Log.d("PAGOMOVIL", "getPagosMoviles: ")
-        var total = 0.0
+
         pagoMovilProvider.getPagoMovil(authProvider.getId()).get().addOnSuccessListener { query ->
-            Log.d("PAGOMOVIL", "authProviderA: ${authProvider.getId()}")
             if (query != null) {
                 if (query.documents.size > 0) {
                     val documents = query.documents
@@ -150,22 +231,20 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
                         pagoMovil?.id = d.id
                         pagoMoviles.add(pagoMovil!!)
                         if (pagoMovil.verificado != true) {
-                            Log.d("COUNTAR", "ADENTRO ADETRO VERIFICADO FALSE:${pagoMovil.verificado} y $totalDollar ")
                             totalSinVeriBs += pagoMovil.montoBs!!.toDouble()
                             totalSinVeriBsDollar += pagoMovil.montoDollar!!.toDouble()
                         }
 
                         if (pagoMovil.verificado != false) {
-                            Log.d("COUNTAR", "ADENTRO VERIFICADO TRUE: ${pagoMovil.verificado} y $totalDollar ")
-                            totalBs += pagoMovil.montoBs!!.toDouble()
+                            totalBsVerifi += pagoMovil.montoBs!!.toDouble()
                             totalDollar += pagoMovil.montoDollar!!.toDouble()
                         }
                     }
                 }
             }
             val totalVerdes = totalDollar
-            binding.txtSaldo.text = totalDollar.toString() + "$"
-            progressDialog.hideProgressBar(this)
+            binding.txtSaldo.text = totalDollar.toString()
+           // progressDialog.hideProgressBar(this)
             updateBilletera(authProvider.getId(),totalVerdes)
         }
 
@@ -183,29 +262,21 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
     }
 
 
-
-
-    private fun goToSearchDriver() {
+     fun goToSearchDriver() {
         //verifica que el boton de pago con billetera esta activo
-        if(binding.optBilletera.isChecked){
+        if(binding.togglePMovil.isChecked){
+
             tipoDepago = "Billetera"
-            if (total>totalDollar){
-                //MENSAGE DE CONFIRMACION DE SALIDA*********************
+            val totalRedondeado = String.format("%.2f", totalDolarConfig)
 
-                    val builder = AlertDialog.Builder(this)
-                    builder.setTitle("Recargar")
-                    builder.setMessage("Saldo Insuficiente, Desea Recargar Ahora??")
-                    builder.setPositiveButton("Si", DialogInterface.OnClickListener { dialog, which ->
+            if (totalRedondeado.toDouble()>binding.txtSaldo.text.toString().toDouble()){ //verica si tiene saldo en billetera
 
-                        goToBankActivity()
-                    })
-                    builder.setNegativeButton("No",null )
-                    builder.show()
-
+                //LLAMA AL FRAGMENT
+                llamarFragmenPagoM()
 
                 return
             }else{
-
+                Log.d("precioBs", "afuera del if originalLNG $totalBsVerifi ")
                 if (originLatLng != null && destinationLatLng != null) {
                     val i = Intent(this, SearchActivity::class.java)
                     i.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -217,9 +288,13 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
                     i.putExtra("destination_lng", destinationLatLng?.longitude)
                     i.putExtra("time", time)
                     i.putExtra("distance", distance)
-                    //PARA MANDAR A BUSCAR CARRO(MOTO)
                     i.putExtra("tipo",tipoVehiculo)
-                    i.putExtra("total",total)
+                    i.putExtra("total",totalDolarConfig)
+                    i.putExtra("tazaBcv",tazaBcv)
+
+                    i.putExtra("totalViajeDollar",binding.textViewPrice.text.toString().toDouble())
+                    i.putExtra("totalbs",totalbs)
+                    Log.d("precioBs", "Saliendo de TripInfoActivity totalBs $totalBsVerifi ")
                     i.putExtra("tipoDepago",tipoDepago)
                     startActivity(i)
                 }
@@ -241,9 +316,13 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
                 i.putExtra("destination_lng", destinationLatLng?.longitude)
                 i.putExtra("time", time)
                 i.putExtra("distance", distance)
-                //PARA MANDAR A BUSCAR CARRO(MOTO)
                 i.putExtra("tipo",tipoVehiculo)
-                i.putExtra("total",total)
+                i.putExtra("total",totalDolarConfig)
+                i.putExtra("tazaBcv",tazaBcv)
+
+                i.putExtra("totalViajeDollar",binding.textViewPrice.text.toString().toDouble())
+                i.putExtra("totalbs",totalbs)
+                Log.d("precioBs", "Saliendo de TripInfoActivity totalBs $totalBsVerifi ")
                 i.putExtra("tipoDepago",tipoDepago)
                 startActivity(i)
             }
@@ -253,31 +332,21 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
         }
     }
 
-        //Va al banco para ReCargar
-    private fun goToBankActivity() {
-        val i = Intent(this, BankActivity::class.java)
-        i.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(i)
-
-    }
 
     //OPTIENE EL PRECIO DE VIAJE!(YO)**********
     private fun getPrices(distance: Double, time: Double) {
         //** verifica si es horario nocturno*************
-            val horaActual = LocalTime.now()
-            val horaLimite1 = LocalTime.of(23, 0) // 11:00 PM
-            val horaLimite2 = LocalTime.of(6, 0) // 6:00 AM
-
-            if (horaActual.isAfter(horaLimite1) || horaActual.isBefore(horaLimite2)) {
-               esNoturno=true
-                binding.textTipoTarifa.text= "Nocturna"
-
-            } else {
-                esNoturno= false
-                binding.textTipoTarifa.text= "Diurna"
-            }
-        //***********************************************
-
+        val horaActual = obtenerHoraActual()
+        val horaLimite1 = horaActual.withHour(23).withMinute(0) // 23:00 (11:00 PM)
+        val horaLimite2 = horaActual.withHour(6).withMinute(0) // 6:00 (6:00 AM)
+        Log.d("HoraLOcal", "HoraLOcal:horaActual $horaActual  horaLimite1 $horaLimite1 horaLimite2 $horaLimite2 ")
+        if (horaActual.isAfter(horaLimite1) || horaActual.isBefore(horaLimite2)) {
+            esNoturno = true
+            binding.textTipoTarifa.text = "Nocturna"
+        } else {
+            esNoturno = false
+            binding.textTipoTarifa.text = "Diurna"
+        }
 
         configProvider.getPrices().addOnSuccessListener { document ->
 
@@ -289,8 +358,11 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
             var ClargaCarro = 0.0
             var kmCarro = 0.0
             var kmMoto = 0.0
+
             if (document.exists()) {
                 val prices = document.toObject(Prices::class.java) // DOCUMENTO CON LA INFORMACION
+
+                tazaBcv= prices?.taza!!.toDouble()
                 if (esNoturno){
                     CcortaMoto = prices?.CcortaMoto!!.toDouble()*1.5
                      CmediaMoto = prices?.CmediaMoto!!.toDouble()*1.5
@@ -317,40 +389,54 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
 
                 if (tipoVehiculo == "Carro"){
 
-                    if (distance<3.2) {
-                        total = CcortaCarro!!.toDouble()
+                    if (distance<3.0) {
+                        totalDolarConfig = CcortaCarro!!.toDouble()
+                        //totalbs = CcortaCarro!!.toDouble()*tazaBcv// calula los precios en bs
+                        totalbs= totalDolarConfig*tazaBcv
                     }
-                    if (distance>3.2 && distance<5) {
-                        total = CmediaCarro!!.toDouble()
+                    if (distance>3.0 && distance<5) {
+                        totalDolarConfig = CmediaCarro!!.toDouble()
+                        //totalbs = CmediaCarro!!.toDouble()*tazaBcv// calula los precios en bs
+                        totalbs= totalDolarConfig*tazaBcv
                     }
                     if (distance>5 && distance<7){
-                        total = ClargaCarro!!.toDouble()
+                        totalDolarConfig = ClargaCarro!!.toDouble()
+                      //  totalbs = ClargaCarro!!.toDouble()*tazaBcv// calula los precios en bs
+                        totalbs= totalDolarConfig*tazaBcv
                     }
                     if (distance>7 ){ // FALTA CALCULAR BIEN DESPUES DE 12KM
-                        total =  ClargaCarro!!.toDouble()+ (distance-7)*kmCarro!!.toDouble()
+                        totalDolarConfig =  ClargaCarro!!.toDouble()+ (distance-7)*kmCarro!!.toDouble()
+                        //totalbs = (ClargaCarro!!.toDouble()+ (distance-7)*kmCarro!!.toDouble())*tazaBcv// calula los precios en bs
+                        totalbs= totalDolarConfig*tazaBcv
                     }
+                    Log.d("precioBs", "totalDolarConfig $totalDolarConfig  totalbs $totalbs prices?.taza!!.toDouble() ${prices?.taza!!.toDouble()}  tazaBcv $tazaBcv ")
+
 
                 }
 
                 if (tipoVehiculo == "Moto"){
                     if (distance<3) {
-                        total = CcortaMoto!!.toDouble()
+                        totalDolarConfig = CcortaMoto!!.toDouble()
+                        totalbs= totalDolarConfig*tazaBcv
                     }
                     if (distance>3 && distance<5) {
-                        total = CmediaMoto!!.toDouble()
+                        totalDolarConfig = CmediaMoto!!.toDouble()
+                        totalbs= totalDolarConfig*tazaBcv
                     }
                     if (distance>5 && distance<7){
-                        total = ClargaMoto!!.toDouble()
+                        totalDolarConfig = ClargaMoto!!.toDouble()
+                        totalbs= totalDolarConfig*tazaBcv
                     }
                     if (distance>7){ // FALTA CALCULAR BIEN DESPUES DE 12KM
-                        total =  ClargaMoto!!.toDouble() + (distance-7)*kmMoto!!.toDouble()
+                        totalDolarConfig =  ClargaMoto!!.toDouble() + (distance-7)*kmMoto!!.toDouble()
+                        totalbs= totalDolarConfig*tazaBcv
                     }
 
                 }
-                Log.d("PRICE", "VALOS FINAL DE TOTAL: $total ")
-                val minTotalString = String.format("%.1f", total)
+                Log.d("PRICE", "VALOS FINAL DE TOTAL: $totalDolarConfig ")
+                val minTotalString = String.format("%.1f", totalDolarConfig)
                 //  val maxTotalString = String.format("%.1f", maxTotal)
-                binding.textViewPrice.text = "$minTotalString$"
+                binding.textViewPrice.text = "$minTotalString"
 
                 progressDialog.hideProgressBar(this)
             }
@@ -480,4 +566,6 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
             return
         }
     }
+
+
 }

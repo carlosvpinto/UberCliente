@@ -1,7 +1,6 @@
 package com.carlosvicente.uberkotlin.activities
 
-
-import android.app.Activity
+import java.util.UUID
 import android.content.DialogInterface
 import android.content.Intent
 import android.graphics.Color
@@ -14,9 +13,12 @@ import android.os.CountDownTimer
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
+import android.view.animation.Animation
+import android.view.animation.AnimationUtils
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import com.bumptech.glide.Glide
+import com.carlosvicente.uberkotlin.R
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.ListenerRegistration
@@ -44,6 +46,8 @@ import kotlin.collections.HashMap
 
 
 class SearchActivity : AppCompatActivity() {
+    private val conductor2Ani: Animation by lazy { AnimationUtils.loadAnimation(this, R.anim.ani_conductor_conseguido) }
+
 
     private var listenerBooking: ListenerRegistration? = null
     private lateinit var binding: ActivitySearchBinding
@@ -55,7 +59,10 @@ class SearchActivity : AppCompatActivity() {
     private var extraDestinationLng = 0.0
     private var extraTime = 0.0
     private var extraDistance = 0.0
-    private var extratotal = 0.0
+    private var extratotalDollar = 0.0
+    private var extratotalBs = 0.0
+    private var extraTazaBcv = 0.0
+
     private var extraTipoDePago = ""
 
     var easyWayLocation: EasyWayLocation? = null
@@ -99,12 +106,15 @@ class SearchActivity : AppCompatActivity() {
 
     private var bookinglate: Booking? = null
 
-
     //Moto
     val origin: String? = null
     var isMoto = false
 
-
+    //buscar 3 conductores
+    private var numDriversFound = 0
+    var idDriver1 = ""
+    var idDriver2 = ""
+    var idDriver3= ""
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -115,7 +125,10 @@ class SearchActivity : AppCompatActivity() {
 
         // EXTRAS
         extraTipoDePago = intent.getStringExtra("tipoDepago")!!
-        extratotal = intent.getDoubleExtra("total",0.0)
+        extratotalDollar = intent.getDoubleExtra("total",0.0)
+        extratotalBs = intent.getDoubleExtra("totalbs",0.0)
+        extraTazaBcv = intent.getDoubleExtra("tazaBcv",0.0)
+        Log.d("precioBs", "llegando SearchaActivity extratotalBs $extratotalBs ")
         extraOriginName = intent.getStringExtra("origin")!!
         extraDestinationName = intent.getStringExtra("destination")!!
         extraOriginLat = intent.getDoubleExtra("origin_lat", 0.0)
@@ -138,6 +151,12 @@ class SearchActivity : AppCompatActivity() {
 
     }
 
+
+    //ACTIVA LA ANIMACION EL FLOATINBOTTOM
+    private fun iniAnimation() {
+            binding.layoutdatosConductor2.startAnimation(conductor2Ani)
+
+    }
 //INICIAR BUSQUEDA****YO**************
     private fun iniciarBusqueda(){
     //VERIFICA SI ES MOTO O CARRO/////
@@ -150,6 +169,7 @@ class SearchActivity : AppCompatActivity() {
     if (isMoto!= true){
         Log.d("prioridad", "ENTRA A TIPO DE VEHICULO: $isMoto")
         getClosestDriver()
+       // getClosestDriver3Cond()  //PARA BUSCAR3
     }
     if (isMoto!= false){
         // getClosestDriverMoto() INAVILITADO TEMPORAL HASTA TENER MOTOS ACTIVAS***********************************
@@ -292,7 +312,7 @@ class SearchActivity : AppCompatActivity() {
                 booking = snapshot.toObject(Booking::class.java)
 
                 if (booking?.status == "accept") {
-                    Log.d("prioridad", "VALOR DE BOOKING.STATUS: ${booking?.status}")
+
                     Toast.makeText(this@SearchActivity, "Viaje aceptado", Toast.LENGTH_LONG).show()
                     swTiempo= true
                     if (countDownTimer != null && countDownTimer?.onFinish()!= null ){
@@ -320,17 +340,18 @@ class SearchActivity : AppCompatActivity() {
     private fun creaReciboCobro() {
 
     val df = DecimalFormat("#.##")
-    val extratotalRedondeado = df.format(extratotal).toDouble()
+    val montoDollarRedondeado = df.format(extratotalDollar).toDouble()
+    val montoBsRedondeado = df.format(montoDollarRedondeado*extraTazaBcv)
 
         if (extraTipoDePago== "Billetera") {
             val pagoMovil = PagoMovil(
 
                 idClient = authProvider.getId(),
                 nro= "viaje",
-                montoBs = -extratotalRedondeado*25,//ACOMODAR ES TEMPORAL
-                montoDollar = -extratotalRedondeado,
+                montoBs = -montoBsRedondeado.toDouble(),//ACOMODAR ES TEMPORAL
+                montoDollar = -montoDollarRedondeado,
                 fechaPago =Date().toString(),
-                tazaCambiaria = 25.0,
+                tazaCambiaria = extraTazaBcv,
                 timestamp = Date().time,
                 verificado = true,
                 date = Date()
@@ -350,21 +371,27 @@ class SearchActivity : AppCompatActivity() {
 
     //CREA UN RECIBO PARA EL CONDUCTOR QUE ACEPTO LA CARRERA
     private fun creaReciboConductor() {
+        //para redondear a 2 decimales
         val df = DecimalFormat("#.##")
-        val extratotalRedondeado = df.format(extratotal).toDouble()
+        val montoDollarRedondeado = df.format(extratotalDollar).toDouble()
+        val montoBsRedondeado = df.format(montoDollarRedondeado*extraTazaBcv)
+        val uniqueId: String = UUID.randomUUID().toString()
+        val last10Digits = uniqueId.takeLast(10)
+
 
         if (extraTipoDePago== "Billetera") {
             val reciboConductor = ReciboConductor(
 
                 idClient = authProvider.getId(),
                 idDriver = booking?.idDriver,
-                nro = booking?.id,
-               // montoBs = -extratotalRedondeado*25,//ACOMODAR ES TEMPORAL
-                montoDollar = booking?.price,
+                nro =  last10Digits,
+                montoBs = montoBsRedondeado.toDouble(),
+                montoDollar = montoDollarRedondeado,
                 fechaPago =Date().toString(),
-
+                tazaCambiaria = extraTazaBcv,
                 timestamp = Date().time,
                 verificado = false,
+
                 date = Date()
             )
 
@@ -417,6 +444,9 @@ class SearchActivity : AppCompatActivity() {
 
     //CREA LA SOLICITUD DE VIAJE CON ESTATUS "create"
     private fun createBooking(idDriver: String) {
+        //para redondear a 2 decimales
+        val df = DecimalFormat("#.##")
+        val montoDollarRedondeado = df.format(extratotalDollar).toDouble()
 
         val booking = Booking(
             idClient = authProvider.getId(),
@@ -430,7 +460,9 @@ class SearchActivity : AppCompatActivity() {
             originLng = extraOriginLng,
             destinationLat = extraDestinationLat,
             destinationLng = extraDestinationLng,
-            price = extratotal,
+            price = montoDollarRedondeado,
+            priceBs = extratotalBs,
+            tipoPago = extraTipoDePago,
             date= Date()
         )
         bookinglate = booking
@@ -458,7 +490,7 @@ class SearchActivity : AppCompatActivity() {
             destination = extraDestinationName,
             origin = extraOriginName,
             time = Date().time,
-            price = extratotal,
+            price = extratotalDollar,
             km = extraDistance,
             fecha= Date()
         )
@@ -556,6 +588,83 @@ class SearchActivity : AppCompatActivity() {
         }
     }
 
+    //PARA BUSCAR 3 CONDUCTORES AL MISMO TIEMPO
+
+    private fun getClosestDriver3Cond() {
+
+        geoProvider.getNearbyDrivers(originLatLng!!, radius).addGeoQueryEventListener(object: GeoQueryEventListener {
+
+            override fun onKeyEntered(documentID: String, location: GeoPoint) {
+                if (numDriversFound < 3) {
+                    Log.d("BUSQUEDA3", "AFUERA DEL IF:documentID $documentID")
+                    if(idDriver1==""){
+                        idDriver1 = documentID
+                        numDriversFound++
+                        idDriver = documentID
+                        getDriverInfo()
+                        Log.d("BUSQUEDA3", "DENTRO DEL IF:idDriver1: $idDriver1")
+                        driverLatLng = LatLng(location.latitude, location.longitude)
+                        binding.textViewSearch.append("\nCARRO NRO $numDriversFound ENCONTRADO\nESPERANDO RESPUESTA DE CONDUCTOR S/N:$idDriver")
+                        createBooking(documentID)
+                        return
+                    }
+                    if(idDriver1!=""&& idDriver2=="" && idDriver1!= documentID){
+                        idDriver2 = documentID
+                        numDriversFound++
+                        idDriver = documentID
+                        getDriverInfo()
+                        Log.d("BUSQUEDA3", "DENTRO DEL IF:idDriver2: $idDriver2  idDriver1: $idDriver1")
+                        driverLatLng = LatLng(location.latitude, location.longitude)
+                        binding.textViewSearch.append("\nCARRO NRO $numDriversFound ENCONTRADO\nESPERANDO RESPUESTA DE CONDUCTOR S/N:$idDriver")
+                        createBooking(documentID)
+                        return
+                    }
+                    if(idDriver2!="" && idDriver3== "" && idDriver2 != documentID && idDriver1!= documentID){
+                        idDriver3 = documentID
+                        numDriversFound++
+                        idDriver = documentID
+                        getDriverInfo()
+                        Log.d("BUSQUEDA3", "DENTRO DEL IF:idDriver3: $idDriver3  idDriver2: $idDriver2  idDriver1: $idDriver1")
+                        driverLatLng = LatLng(location.latitude, location.longitude)
+                        binding.textViewSearch.append("\nCARRO NRO $numDriversFound ENCONTRADO\nESPERANDO RESPUESTA DE CONDUCTOR S/N:$idDriver")
+                        createBooking(documentID)
+                        return
+                    }
+
+                }
+
+            }
+            override fun onKeyExited(documentID: String) {
+
+            }
+            override fun onKeyMoved(documentID: String, location: GeoPoint) {
+
+            }
+            override fun onGeoQueryError(exception: Exception) {
+
+            }
+
+            override fun onGeoQueryReady() { // TERMINA LA BUSQUEDA
+                if (numDriversFound < 3) {
+                    radius = radius + 0.2
+
+                    if (radius > limitRadius) {
+                        binding.textViewSearch.text = "NO SE ENCONTRARON $numDriversFound VEHICULOS"
+                        Log.d("BUSQUEDA3", "EN  $idDriver3 onGeoQueryReady idDriver1: $idDriver1 idDriver2: $idDriver2  idDriver3: $idDriver3")
+                        goToMap()
+                        return
+                    } else {
+                        getClosestDriver3Cond()
+                    }
+                }
+
+            }
+
+        })
+    }
+
+
+
     //PARA BUSCAR SOLO A MOTOS
     private fun getClosestDriverMoto() {
         geoProvider.getNearbyDriversMoto(originLatLng!!, radius).addGeoQueryEventListener(object: GeoQueryEventListener {
@@ -566,25 +675,17 @@ class SearchActivity : AppCompatActivity() {
                     idDriver = documentID
                     getDriverInfo()
 
-                    Log.d("FIRESTORE", "Conductor id: $idDriver")
                     driverLatLng = LatLng(location.latitude, location.longitude)
-                    //VERICA CUANTOS INTENTOS DE BUSQUEDA LLEVA
                         binding.textViewSearch.text = "MOTO ENCONTRADA\nESPERANDO RESPUESTA DE CONDUCTOR S/N:$idDriver"
-
-
-
                     createBooking(documentID)
                 }
             }
-
             override fun onKeyExited(documentID: String) {
 
             }
-
             override fun onKeyMoved(documentID: String, location: GeoPoint) {
 
             }
-
             override fun onGeoQueryError(exception: Exception) {
 
             }
@@ -611,7 +712,6 @@ class SearchActivity : AppCompatActivity() {
 
         // BUSCA SOLO CARRO/**************************
     private fun  getClosestDriver() {
-            Log.d("prioridad", "getClosestDriver: IDDRIVER $idDriver")
         //BUSCA AL CONDUCTOR PRIORIDAD() ********
         if (!suichePrioridad){
             suichePrioridad= true
@@ -619,17 +719,13 @@ class SearchActivity : AppCompatActivity() {
                 if (document.exists()) {
                     if (document.contains("l")) {
                         prioridadDisponible = true
-                        Log.d("Prioridad", "CONDUCTOR PRORITARIO  DISPONIBLE:$prioridadDisponible ")
                     }else{
                         prioridadDisponible= false
-                        Log.d("Prioridad", "CONDUCTOR PRORITARIO NO DISPONIBLE:$prioridadDisponible ")
                     }
                 }
             }
         }
 
-        //**********************************
-            Log.d("Prioridad", "ANTES DE getNearbyDrivers  getNearbyDrivers getNearbyDrivers: $radius y prioridadDisponible:$prioridadDisponible ")
         geoProvider.getNearbyDrivers(originLatLng!!, radius).addGeoQueryEventListener(object: GeoQueryEventListener {
 
             override fun onKeyEntered(documentID: String, location: GeoPoint) {
@@ -639,22 +735,17 @@ class SearchActivity : AppCompatActivity() {
 
                         if (prioridadDisponible){
                             val idDriverorioridad = "hrypyVnj1UQI673pQwgtpHmEqWh2"
-                            //val idDriverPrioridad2 = "OLkkqbfz3eUxajXSBnbxfCzU0Qi2"
-                            Log.d("Prioridad", "override onKeyEntered Prioridad Disponible verdadera:$prioridadDisponible y Radius: $radius")
 
                           if (documentID== idDriverorioridad){
                               isDriverFound = true
                               idDriver = documentID
                               getDriverInfo()
 
-                              Log.d("Prioridad", "override onKeyEntered despues del getDriverInfo :${driver?.name} $prioridadDisponible y Radius: $radius")
                               driverLatLng = LatLng(location.latitude, location.longitude)
                               binding.textViewSearch.text = "VEHICULO ENCONTRADO\n" +
                                       "ESPERANDO RESPUESTA DEL CONDUCTOR S/N:$idDriver"
-
                               suichePrioridad= false
                               createBooking(documentID)
-                              //createSolicitudes(authProvider.getId() )
 
                           }
 
@@ -775,13 +866,7 @@ class SearchActivity : AppCompatActivity() {
         super.onDestroy()
         listenerBooking?.remove()
     }
-private fun sincronizar(){
-    val intent = Intent("com.carlosvicente.uberkotlin.ACTION_SYNC_TIMER").apply {
-        putExtra("time", System.currentTimeMillis())
-    }
-    sendBroadcast(intent)
 
-}
 
 }
 

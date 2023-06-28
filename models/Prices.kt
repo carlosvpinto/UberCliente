@@ -16,7 +16,9 @@ data class Prices (
     val kmMoto: Double? = null,
     val min: Double? = null,
     val minValue: Double? = null,
-    val difference: Double? = null
+    val difference: Double? = null,
+    val taza: Double? = null,
+
 ) {
     public fun toJson() = klaxon.toJsonString(this)
 

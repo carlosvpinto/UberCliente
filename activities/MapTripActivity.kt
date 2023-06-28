@@ -52,6 +52,8 @@ import com.tommasoberlose.progressdialog.ProgressDialogFragment
 import org.imperiumlabs.geofirestore.extension.getLocation
 import kotlin.math.log
 
+
+
 class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, DirectionUtil.DirectionCallBack {
 
 
@@ -84,6 +86,8 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
     private var wayPoints: ArrayList<LatLng> = ArrayList()
     private val WAY_POINT_TAG = "way_point_tag"
     private lateinit var directionUtil: DirectionUtil
+
+
 
 
     private var isDriverLocationFound = false
@@ -134,6 +138,7 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION
         ))
+
 
     }
 
@@ -380,6 +385,7 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
         easyWayLocation?.endUpdates()
         listenerBooking?.remove()
         listenerDriverLocation?.remove()
+
     }
 
     override fun onMapReady(map: GoogleMap) {

@@ -155,7 +155,7 @@ class TripInfoMotoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, 
 
                 val minTotalString = String.format("%.1f", total)
                 //  val maxTotalString = String.format("%.1f", maxTotal)
-                binding.textViewPrice.text = "$total$"
+                binding.textViewPrice.text = "$total"
 
 
             }
