@@ -10,8 +10,12 @@ private val klaxon = Klaxon()
 data class Booking (
     val id: String? = null,
     val activo: Boolean = true,
+    val idDriverAsig: String? = null,
+    val asignado: Boolean? = false,
     val idClient: String? = null,
     val idDriver: String? = null,
+    val idDriver2: String? = null,
+    val idDriver3: String? = null,
     val origin: String? = null,
     val destination: String? = null,
     val status: String? = null,

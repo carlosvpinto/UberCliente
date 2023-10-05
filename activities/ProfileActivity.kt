@@ -181,7 +181,7 @@ class ProfileActivity : AppCompatActivity() {
                         if (pagoMovil.verificado != false) {
                             Log.d("COUNTAR", "ADENTRO VERIFICADO TRUE: ${pagoMovil.verificado} y $totalDollar ")
                             totalBs += pagoMovil.montoBs!!.toDouble()
-                            totalDollar += pagoMovil.montoDollar!!.toDouble()
+                            totalDollar += pagoMovil.montoDollar!!.toInt()
                         }
                     }
                 }

@@ -134,34 +134,12 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
         //RECIBE EL TIPO DE VEHICULO DE LA SEARCHACTIVITY**************
         extraTipo = intent.getStringExtra("tipo")!!
         Log.d("TIPOV", "VALOR DE EXTRATIPO TRAIDA PANTALLA SEARCHA:= $extraTipo")
-        locationPermissions.launch(arrayOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        ))
+
 
 
     }
 
-    val locationPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permission ->
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            when {
-                permission.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
-                    Log.d("LOCALIZACION", "Permiso concedido")
-
-
-                }
-                permission.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
-                    Log.d("LOCALIZACION", "Permiso concedido con limitacion")
-
-                }
-                else -> {
-                    Log.d("LOCALIZACION", "Permiso no concedido")
-                }
-            }
-        }
-
-    }
 
 
     //MENSAGE DE CONFIRMACION DE SALIDA*********************
@@ -218,7 +196,7 @@ class MapTripActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Direc
 // VERIFICA LA LOCALIZACION DEL CONDUCTOR ****************
     private fun getLocationDriver() {
         if (booking != null) {
-            listenerDriverLocation = geoProvider.getLocationWorking(booking?.idDriver!!).addSnapshotListener { document, e ->
+            listenerDriverLocation = geoProvider.getLocationWorking(booking?.idDriverAsig!!).addSnapshotListener { document, e ->
                 if (e != null) {
                     Log.d("FIRESTORE", "ERROR: ${e.message}")
                     return@addSnapshotListener

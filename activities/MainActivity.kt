@@ -26,6 +26,14 @@ import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.tommasoberlose.progressdialog.ProgressDialogFragment
+import com.google.firebase.remoteconfig.FirebaseRemoteConfig
+
+import com.google.firebase.ktx.Firebase
+import android.app.Application
+import android.icu.util.UniversalTimeScale.toLong
+import com.google.common.primitives.UnsignedInts.toLong
+import com.google.firebase.FirebaseApp
+import com.google.firebase.remoteconfig.FirebaseRemoteConfigSettings
 import java.net.URL
 import java.util.regex.Pattern
 
@@ -42,6 +50,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var auth : FirebaseAuth
     private lateinit var googleSignInClient : GoogleSignInClient
     private lateinit var binding: ActivityMainBinding
+    private  var client: Client? = null
+    private var cliente: Client? = null
     val authProvider = AuthProvider()
     private val clientProvider= ClientProvider()
 
@@ -51,6 +61,22 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+
+        //RECIBO EL CLIENTE****************
+
+        val extras = intent.extras
+        Log.d("CLIENTE", "ENTRANDO AL MAINACTIVITY extras: ${extras} Client $Client")
+        if (extras != null) {
+            val clientJson = extras.getString("client")
+            if (!clientJson.isNullOrEmpty()){
+                client = Client.fromJson(clientJson!!)!!
+            }
+
+
+        }
+        //INIALIZA FIREBASE CONFIG
+        FirebaseApp.initializeApp(this)
+        versionUltima()
 
 
         //VERIFICA LA VERSION DEL SISTEMA OPERATIVO
@@ -94,6 +120,34 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+    //VERIFICA LA VERSION DEL LA APP
+    private fun versionUltima(){
+        val remoteConfig = FirebaseRemoteConfig.getInstance()
+        remoteConfig.fetchAndActivate()
+        val requiredVersionMinima = remoteConfig.getLong("version_code_required")
+        val requiredSaludo = remoteConfig.getString("mensajebienvenida")
+        val packageInfo = packageManager.getPackageInfo(packageName, 0)
+        val versionCodeActual = packageInfo.versionCode
+
+        Log.d("VERSION", "VALOR DE LA VERSION requiredSaludo $requiredSaludo")
+        Log.d("VERSION", "VALOR DE LA VERSION $requiredVersionMinima packageInfo $packageInfo versionCode $versionCodeActual")
+        if (versionCodeActual < requiredVersionMinima) {
+            // Mostrar un diálogo de actualización y redirigir a la Play Store.
+            Toast.makeText(this, "Necesitas Actualizar Tu version por la $requiredVersionMinima", Toast.LENGTH_LONG).show()
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.carlosvicente.uberkotlin"))
+            startActivity(intent)
+            finish() // O bloquea el acceso a la aplicación
+        } else {
+            // Continuar con la aplicación normalmente.
+            if (requiredSaludo.isNotEmpty()){
+                Toast.makeText(this, " $requiredSaludo", Toast.LENGTH_LONG).show()
+            }
+
+        }
+
+    }
+
+
 
     //PARA INICIAR CON GOOGLE
     private fun signInGoogle() {
@@ -103,7 +157,7 @@ class MainActivity : AppCompatActivity() {
 
     private val launcher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()){
             result ->
-        if (result.resultCode == Activity.RESULT_OK){
+        if (result.resultCode == RESULT_OK){
             Log.d("GOOGLE", "VALOS DE RESULT EN LAUNCHER ${result.resultCode}")
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             handleResults(task)
@@ -180,12 +234,13 @@ class MainActivity : AppCompatActivity() {
         if (isValidForm(email, password)) {
             authProvider.login(email, password).addOnCompleteListener {
                 if (it.isSuccessful){
+                  //  getClient()
                    goToMap()
                     progressDialog.hideProgressBar(this)
                 }
                 else {
                     progressDialog.hideProgressBar(this)
-                    Toast.makeText(this@MainActivity, "ERROR INICANDO SECION", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "ERROR INICANDO SECION ${it.exception.toString()}", Toast.LENGTH_SHORT).show()
 
                     Log.d("FIREBASE", "ERROR: ${it.exception.toString()}")
                 }
@@ -193,11 +248,30 @@ class MainActivity : AppCompatActivity() {
 
         }
     }
-    private fun goToMap() {
-        val i = Intent(this, MapActivity::class.java)
-        i.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
-        startActivity(i)
+    //OBTIENE LA INFOR DEL CLIENTE ****YO***********************************TRAIDO
+    private fun getClient() {
+        if (authProvider.existSession()) {
+            clientProvider.getClientById(authProvider.getId()).addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val client = document.toObject(Client::class.java)
+                    cliente = client
+
+                    Log.d("CLIENTE", "en getcliente: ${client?.email} ${client?.name} ${client?.lastname}")
+
+                }
+            }
+        }
     }
+    private fun goToMap() {
+        val intent = Intent(this, MapActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
+        val bundle = Bundle()
+        bundle.putString("client",null)
+        intent.putExtras(bundle)
+        Log.d("CLIENTE", "en SALIENDO DE MapActivity:bundle $bundle")
+        startActivity(intent)
+    }
+
 
     private fun isValidForm(email: String, password: String): Boolean {
 

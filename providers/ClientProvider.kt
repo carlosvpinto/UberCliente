@@ -11,6 +11,7 @@ import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageTask
 import com.google.firebase.storage.UploadTask
 import com.carlosvicente.uberkotlin.models.Client
+import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.messaging.FirebaseMessaging
 import java.io.File
 
@@ -58,8 +59,6 @@ class ClientProvider {
     }
     fun updateBilleteraClient(id: String, monto: Double): Task<Void> {
         return db.document(id).update("billetera", monto).addOnFailureListener { exception ->
-            Log.d("FIRESTORE", "ERROR: ${exception.message}")
-            Log.d("BILLETERA", "Monto: ${monto}")
         }
     }
 
@@ -73,6 +72,33 @@ class ClientProvider {
         }
         return db.document(client?.id!!).update(map)
     }
+
+    fun editarDirecFrecuente1(idClient: String, direFrecuen1: String, latFrecuente1: Double, lngFrecuente1:Double): Task<Void> {
+        val updates = hashMapOf<String, Any>(
+            "direcionFrecu1" to direFrecuen1,
+            "latFrecuente1" to latFrecuente1,
+            "lngFrecuente1" to lngFrecuente1,
+        )
+
+        return db.document(idClient).update(updates)
+            .addOnFailureListener { exception ->
+                Log.d("FIRESTORE", "ERROR: ${exception.message}")
+            }
+    }
+
+    fun editarDirecFrecuente2(idClient: String, direFrecuen2: String, latFrecuente2: Double, lngFrecuente2:Double): Task<Void> {
+        val updates = hashMapOf<String, Any>(
+            "direcionFrecu2" to direFrecuen2,
+            "latFrecuente2" to latFrecuente2,
+            "lngFrecuente2" to lngFrecuente2,
+        )
+
+        return db.document(idClient).update(updates)
+            .addOnFailureListener { exception ->
+                Log.d("FIRESTORE", "ERROR: ${exception.message}")
+            }
+    }
+
 
 
 }

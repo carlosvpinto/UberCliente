@@ -158,7 +158,7 @@ class ModalBottomSheetTripInfo: BottomSheetDialogFragment() {
     }
 
     private fun getDriverInfo() {
-        driverProvider.getDriver(booking.idDriver!!).addOnSuccessListener { document ->
+        driverProvider.getDriver(booking.idDriverAsig!!).addOnSuccessListener { document ->
             if (document.exists()) {
                 driver = document.toObject(Driver::class.java)
                 textViewClientName?.text = "${driver?.name} ${driver?.lastname}"

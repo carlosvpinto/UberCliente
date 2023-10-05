@@ -254,6 +254,7 @@ class VerificacionFragment : Fragment() {
             fechaPago = fechaFragment,
             tazaCambiaria = txtBcv?.text.toString().toDouble(),
             timestamp = Date().time,
+            destino = "Pago Movil",
             verificado = true,
             date = Date()
         )

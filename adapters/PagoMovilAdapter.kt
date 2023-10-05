@@ -59,8 +59,11 @@ class PagoMovilAdapter(val context: Activity, var pagoMoviles: ArrayList<PagoMov
         Log.d("COUNTAR", "pagoMoviles.size: ${pagoMoviles.size} ")
         val textView = context.findViewById<TextView>(R.id.txttotaldolares)
         val textViewSinVeri = context.findViewById<TextView>(R.id.txttotalSinveri)
-        textViewSinVeri.text= totalSinVeriBsDollar.toString()// coloca el monto de los dolares sin verificar
-        textView.text = totalDollar.toString()//coloca el monto de los dolares Verificados
+        val dolarVeriFormateado = String.format("%.2f", totalDollar)
+        val dolarSinVeFormateado = String.format("%.2f", totalSinVeriBsDollar)
+
+        textViewSinVeri.text= dolarSinVeFormateado.toString()// coloca el monto de los dolares sin verificar
+        textView.text = dolarVeriFormateado.toString()//coloca el monto de los dolares Verificados
 
         itemCount = pagoMoviles.size
     }

@@ -7,19 +7,28 @@ import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.carlosvicente.uberkotlin.models.Booking
+import com.carlosvicente.uberkotlin.models.PagoMovil
 import com.google.firebase.firestore.DocumentSnapshot
 
 class BookingProvider {
-
     val db = Firebase.firestore.collection("Bookings")
     val authProvider = AuthProvider()
 
-    fun create(booking: Booking): Task<Void> {
+
+    fun create2(booking: Booking): Task<Void> {
+        return db.document(authProvider.getId()).set(booking).addOnFailureListener {
+            Log.d("FIRESTORE", "ERROR: ${it.message}")
+        }
+    }
+    fun creat(booking: Booking): Task<Void> {
         return db.document(authProvider.getId()).set(booking).addOnFailureListener {
             Log.d("FIRESTORE", "ERROR: ${it.message}")
         }
     }
 
+    fun getBooking2(): DocumentReference {
+        return db.document(authProvider.getId())
+    }
 
     fun getBooking(): DocumentReference {
         return db.document(authProvider.getId())
@@ -38,6 +47,39 @@ class BookingProvider {
             Log.d("FIREBASE", "ERROR: ${exception.toString()}")
         }
     }
+
+    fun getBookingAsignando(): Query {
+        return db.whereEqualTo("idClient", authProvider.getId())
+
+    }
+
+
+    fun editarIdDriver2(idClient: String,  idDriver2: String): Task<Void> {
+        return db.document(idClient).update("idDriver2", idDriver2,).addOnFailureListener { exception ->
+            Log.d("FIRESTORE", "ERROR: ${exception.message}")
+        }
+    }
+    fun editarIdDriver3(idClient: String,  idDriver3: String): Task<Void> {
+        return db.document(idClient).update("idDriver3", idDriver3,).addOnFailureListener { exception ->
+            Log.d("FIRESTORE", "ERROR: ${exception.message}")
+        }
+    }
+
+    fun editarIdDriver(idClient: String, idDriver2: String, activo: Boolean): Task<Void> {
+        val updates = hashMapOf<String, Any>(
+            "idDriver2" to idDriver2,
+            "activo" to activo
+        )
+
+        return db.document(idClient).update(updates)
+            .addOnFailureListener { exception ->
+                Log.d("FIRESTORE", "ERROR: ${exception.message}")
+            }
+    }
+
+
+
+
     fun updateStatus(idClient: String, status: String): Task<Void> {
         return db.document(idClient).update("status", status,).addOnFailureListener { exception ->
             Log.d("FIRESTORE", "ERROR: ${exception.message}")

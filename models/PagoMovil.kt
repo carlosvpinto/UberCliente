@@ -17,6 +17,8 @@ data class PagoMovil (
     val tazaCambiaria: Double? = null,
     val timestamp: Long? = null,
     val date: Date?= null,
+    val destino: String?= null,
+    val origen: String?= null,
     val verificado: Boolean? = false
 ) {
     public fun toJson() = klaxon.toJsonString(this)

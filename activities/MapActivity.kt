@@ -21,17 +21,21 @@ import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import android.util.TypedValue
 import android.view.View
 import android.view.WindowManager
+import android.widget.Button
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.bumptech.glide.Glide
 import com.carlosvicente.uberkotlin.R
 import com.carlosvicente.uberkotlin.databinding.ActivityMapBinding
 import com.carlosvicente.uberkotlin.fragments.ModalBottomSheetMenu
 import com.carlosvicente.uberkotlin.models.Booking
+import com.carlosvicente.uberkotlin.models.Client
 import com.carlosvicente.uberkotlin.models.DriverLocation
 import com.carlosvicente.uberkotlin.providers.*
 import com.carlosvicente.uberkotlin.utils.CarMoveAnim
@@ -67,6 +71,14 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
+import com.google.android.gms.maps.model.LatLng
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+
+
+data class Direccion(val nombre: String, val latitud: Float, val longitud: Float)
+
+
 
 class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
 
@@ -80,11 +92,12 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     private val clientProvider = ClientProvider()
     private val bookingProvider = BookingProvider()
     private val configProvider = ConfigProvider()
+    private var cliente: Client? = null
 
     // GOOGLE PLACES
     private var places: PlacesClient? = null
     private var autocompleteOrigin: AutocompleteSupportFragment? = null
-    private var autocompleteDestination: AutocompleteSupportFragment? = null
+    private var  autocompleteDestination: AutocompleteSupportFragment? = null
     private var originName = ""
     private var destinationName = ""
     private var originLatLng: LatLng? = null
@@ -105,9 +118,14 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
 
     //PARA VERIFICAR CON GOOGLE
     private lateinit var auth : FirebaseAuth
-
+    private var client: Client? = null
+    private var clientExtra: Client? = null
     private lateinit var connectivityManager: ConnectivityManager
     private lateinit var networkCallback: ConnectivityManager.NetworkCallback
+    private  val MAX_DIRECCIONES_GUARDADAS = 3
+
+    data class Direccion(val nombre: String, val latitud: Float, val longitud: Float)
+
 
 
 
@@ -116,6 +134,31 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
         binding = ActivityMapBinding.inflate(layoutInflater)
         setContentView(binding.root)
         window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+
+        if (authProvider.existSession()) {
+            //        //RECIBO EL BOOKING****************
+        val extras = intent.extras
+
+        if (extras != null) {
+            val data = extras?.getString("client")
+            Log.d("CLIENTE", "valor de extras $extras valor de data $data")
+            if (!data.isNullOrEmpty()){
+                clientExtra = Client.fromJson(data!!)!!
+                Log.d("CLIENTE", "CLIENTE RECIBIDO EN MAP ACTIVITY: $clientExtra ")
+                if(clientExtra?.image== null ||clientExtra?.image==""){
+                    Toast.makeText(this, "Por favor Agrege su Foto de perfil", Toast.LENGTH_LONG).show()
+                }
+            }else{
+                getClient()
+            }
+
+
+        }
+        }
+
+
+
+
 
         //PARA ACTUALIZAR EL PRECIO DEL DOLAR SOLO CUANDO CARGA POR PRIMERA VEZ
         if(savedInstanceState== null){
@@ -147,19 +190,83 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
         startGooglePlaces()
         removeBooking()
         createToken()
-        startNetworkMonitoring(this)
+      //  startNetworkMonitoring(this)
         FirebaseAnalytics.getInstance(this)
+        disableSSLVerification()
+
+
         binding.btnSolicitarMoto.setOnClickListener { goToTripMotoInfo() }
         binding.btnBuscarCarro.setOnClickListener { goToTripInfo() }
         binding.imageViewMenu.setOnClickListener { showModalMenu() }
         binding.imageViewSalir.setOnClickListener{salirdelApp()}
+        binding.btnDirFrecuente.setOnClickListener {obtenerPrimeraDireccionGuardada() }
+        binding.btnDirFrecuente2.setOnClickListener { obtenerSegundaDireccionGuardada() }
+        binding.btnDirFrecuente3.setOnClickListener { obtenerTercerDireccionGuardada() }
 
-        disableSSLVerification()
 
-
-       // binding.txtposicionActual.setOnClickListener{irPosicionActual()}
     }
-   
+
+    // PIDE PERMISO EN SEGUNDO PLANO
+
+    val locationPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permission ->
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            when {
+                permission.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
+                    Log.d("LOCALIZACION", "Permiso MapActivity Cliente concedido")
+                    if (easyWayLocation!=null){
+                        easyWayLocation?.startLocation()
+                    }
+
+                }
+                permission.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
+                    Log.d("LOCALIZACION", "Permiso MapActivity Clliente no concedido")
+                    if (easyWayLocation!= null){
+                        easyWayLocation?.startLocation()
+                    }
+
+
+                }
+                else -> {
+                    Log.d("LOCALIZACION", "Permiso no concedido")
+                    Toast.makeText(this, "SIN LOS PERMISO DE UBICACION NO PUEDE FUNCIONAR", Toast.LENGTH_LONG).show()
+                    finishAffinity()
+                }
+            }
+        }
+
+    }
+    //OBTIENE LA INFOR DEL CLIENTE ****YO***********************************TRAIDO
+    private fun getClient() {
+        if (authProvider.existSession()) {
+            clientProvider.getClientById(authProvider.getId()).addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val client = document.toObject(Client::class.java)
+                    cliente = client
+                    clientExtra = cliente
+
+                    Log.d("CLIENTE", "en getcliente Splash: ${client?.email} ${client?.name} ${client?.lastname}")
+
+                }
+            }
+        }
+    }
+
+    override fun onStart() {
+
+        mostrarBtnFrecuentes(client)
+        super.onStart()
+    }
+
+    //ELIMINA LA MEMORIA DE DIRECCIONES************************************
+    private fun clearSharedPreferences() {
+        val sharedPreferences = getSharedPreferences("Direcciones", Context.MODE_PRIVATE)
+        val editor = sharedPreferences.edit()
+        editor.clear()
+        editor.apply()
+    }
+
+
 
 
     //ASINCRONO CORRUTINA BCV*************************
@@ -183,7 +290,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
 
                            // actualizarPrecioDolar(valorDolar)
                             configProvider.updateTaza(valorDolar.toDouble()).addOnCompleteListener{
-                                Toast.makeText(this@MapActivity, "Actualizo Precio BCV $valorDolar", Toast.LENGTH_SHORT).show()
+                              //  Toast.makeText(this@MapActivity, "Actualizo Precio BCV $valorDolar", Toast.LENGTH_SHORT).show()
                             }
 
                             // Marcar como obtenido y salir del bucle
@@ -255,33 +362,39 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
         analytics.logEvent("InitScreen",bundle)
     }
 
-    val locationPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permission ->
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            when {
-                permission.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
-                    Log.d("LOCALIZACION", "Permiso concedido")
-                    if (easyWayLocation!=null){
-                        easyWayLocation?.startLocation()
-                    }
-
-                }
-                permission.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
-                    Log.d("LOCALIZACION", "Permiso concedido con limitacion")
-                    if (easyWayLocation!= null){
-                        easyWayLocation?.startLocation()
-                    }
 
 
-                }
-                else -> {
-                    Log.d("LOCALIZACION", "Permiso no concedido")
-                    Toast.makeText(this, "SIN LOS PERMISO DE UBICACION NO PUEDE FUNCIONAR", Toast.LENGTH_LONG).show()
-                    finishAffinity()
-                }
+
+    private fun mostrarBtnFrecuentes(clientE: Client?) {
+        val direccionesGuardadas = obtenerDireccionesGuardadas()
+        var btn= 0
+
+        for (direccion in direccionesGuardadas) {
+            // Realiza las acciones necesarias con cada dirección guardada
+            btn++
+            if (btn==1){
+                binding.btnDirFrecuente.visibility= View.VISIBLE
+                binding.btnDirFrecuente.text= direccionesGuardadas[0].nombre
+                val myButton: Button = findViewById(R.id.btnDirFrecuente)
+                ajustarTamañoLetraBoton(myButton, "boton1")
+
+            }
+            if (btn==2){
+
+                binding.btnDirFrecuente2.visibility= View.VISIBLE
+                binding.btnDirFrecuente2.text= direccionesGuardadas[1].nombre
+                destinationLatLng= LatLng(direccion.latitud.toDouble(),direccion.longitud.toDouble())
+                val myButton: Button = findViewById(R.id.btnDirFrecuente2)
+                ajustarTamañoLetraBoton(myButton,"boton2")
+            }
+            if (btn==3){
+                binding.btnDirFrecuente3.visibility= View.VISIBLE
+                binding.btnDirFrecuente3.text= direccionesGuardadas[2].nombre
+                destinationLatLng= LatLng(direccion.latitud.toDouble(),direccion.longitud.toDouble())
+                val myButton: Button = findViewById(R.id.btnDirFrecuente3)
+                ajustarTamañoLetraBoton(myButton, "boton3")
             }
         }
-
     }
     //MENSAGE DE CONFIRMACION DE SALIDA*********************
 
@@ -543,16 +656,8 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
             i.putExtra("destination", destinationName)
             i.putExtra("origin_lat", myLocationLatLng?.latitude)
             i.putExtra("origin_lng", myLocationLatLng?.longitude)
-            //i.putExtra("origin_lat", originLatLng?.latitude)
-            //i.putExtra("origin_lng", originLatLng?.longitude)
             i.putExtra("destination_lat", destinationLatLng?.latitude!!.toDouble())
-            Log.d("PLACES", "origin_lat PUTEXTRA: ${ myLocationLatLng?.latitude} ")
-            Log.d("PLACES", "origin_lng PUTEXTRA: ${myLocationLatLng?.longitude} ")
-            Log.d("PLACES", "destination_lat PUTEXTRA: ${destinationLatLng?.latitude} ")
-            Log.d("PLACES", "destination_lng PUTEXTRA: ${destinationLatLng?.longitude} ")
-            //i.putExtra("destination_lat", 7.266676999999999)//VALOR FIJO PARA VERIFICAR ERROR
             i.putExtra("destination_lng", destinationLatLng?.longitude)
-            //i.putExtra("destination_lng",-67.4777257)
             i.putExtra("tipo", "Carro")
             startActivity(i)
         }
@@ -598,7 +703,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
 
                 if (originLatLng != null) {
                     val addressList = geocoder.getFromLocation(originLatLng?.latitude!!, originLatLng?.longitude!!, 1)
-                    if (addressList.size > 0) {
+                    if (addressList!!.size > 0) {
                         val city = addressList[0].locality
                         val country = addressList[0].countryName
                         val address = addressList[0].getAddressLine(0)
@@ -634,15 +739,12 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
 
                     val addressList = geocoder.getFromLocation(originLatLng!!.latitude, originLatLng!!.longitude, 1)
 
-                    if (addressList.size > 0) {
+                    if (addressList!!.size > 0) {
                         val city = addressList[0].locality
                         val country = addressList[0].countryName
                         val address = addressList[0].getAddressLine(0)
                         originName = "$address $city"
                         autocompleteOrigin?.setText("$address $city")
-                        Log.d("ORIGENES", "Address onCameraMove ORIGEN: $originName")
-                        Log.d("ORIGENES", "LAT onCameraMove ORIGEN: ${originLatLng!!.latitude}")
-                        Log.d("ORIGENES", "LNG onCameraMove ORIGEN: ${originLatLng!!.longitude}")
                     }
                 }
             } catch (e: Exception) {
@@ -685,16 +787,10 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
         autocompleteOrigin?.setHint("Lugar de recogida")
         autocompleteOrigin?.setCountry("VE")
 
-        Log.d("PLACES", "Address ORIGEN:afuera $originName")
-        Log.d("PLACES", "LAT ORIGEN:afuera ${originLatLng?.latitude}")
-        Log.d("PLACES", "LNG ORIGEN:afuera ${originLatLng?.longitude}")
         autocompleteOrigin?.setOnPlaceSelectedListener(object: PlaceSelectionListener {
             override fun onPlaceSelected(place: Place) {
                 originName = place.name!!
                 originLatLng = place.latLng
-                Log.d("PLACES", "Address ORIGEN: $originName")
-                Log.d("PLACES", "LAT ORIGEN: ${originLatLng?.latitude}")
-                Log.d("PLACES", "LNG ORIGEN: ${originLatLng?.longitude}")
             }
 
             override fun onError(p0: Status) {
@@ -718,13 +814,14 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
         autocompleteDestination?.setOnPlaceSelectedListener(object: PlaceSelectionListener {
 
             override fun onPlaceSelected(place: Place) {
+                autocompleteDestination = supportFragmentManager.findFragmentById(R.id.placesAutocompleteDestination) as AutocompleteSupportFragment
+
                 destinationName = place.name!!
                 destinationLatLng = place.latLng
 
-                Log.d("PLACES", "Address DESTINO: $destinationName")
-                Log.d("PLACES", "LAT DESTINO: ${destinationLatLng?.latitude}")
-                Log.d("PLACES", "LNG DESTINO: ${destinationLatLng?.longitude}")
-                Log.d("PLACES", "place.latLng DESTINO: ${place.latLng}")
+                //USO PARA DIRECIONES FRECUENTES*********************************
+                guardarDireccionEnSharedPreferences(destinationName,destinationLatLng!!)
+
             }
 
             override fun onError(p0: Status) {
@@ -740,7 +837,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     override fun onDestroy() { // CIERRA APLICACION O PASAMOS A OTRA ACTIVITY
         super.onDestroy()
         easyWayLocation?.endUpdates()
-        stopNetworkMonitoring()
+       // stopNetworkMonitoring()
     }
 
     override fun onMapReady(map: GoogleMap) {
@@ -782,10 +879,7 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     }
 
     override fun currentLocation(location: Location) { // ACTUALIZACION DE LA POSICION EN TIEMPO REAL
-        Log.d("MAPAS", "VALOS DE myLocationLatLng: ${myLocationLatLng}")
         myLocationLatLng = LatLng(location.latitude, location.longitude) // LAT Y LONG DE LA POSICION ACTUAL
-
-
 
         if (!isLocationEnabled) { // UNA SOLA VEZ
             isLocationEnabled = true
@@ -803,36 +897,150 @@ class MapActivity : AppCompatActivity(), OnMapReadyCallback, Listener {
     }
 
 
-    // Llama a este método para comenzar a monitorear el estado de la red
-    private fun startNetworkMonitoring(context: Context) {
-        connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
-        val networkRequest = NetworkRequest.Builder()
-            .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
-            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-            .build()
+    private fun guardarDireccionEnSharedPreferences(destino: String, coordenadas: LatLng) {
+        val sharedPreferences = getSharedPreferences("Direcciones", Context.MODE_PRIVATE)
+        val editor = sharedPreferences.edit()
 
-        networkCallback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                // La conexión a internet está disponible
+        val direccionesGuardadas = obtenerDireccionesGuardadas()
+        Log.d("DIRECCIONESG", "direccionesGuardadas ${direccionesGuardadas} ")
 
-                binding.imageViewInternet.setImageResource(R.drawable.ic_internet)
-                Toast.makeText(context, "Conexion a Internet Disponible", Toast.LENGTH_SHORT).show()
+        // Verifica si la dirección ya está guardada
+        if (!direccionesGuardadas.any { it.nombre == destino }) {
+            val nuevaDireccion = Direccion(destino, coordenadas.latitude.toFloat(), coordenadas.longitude.toFloat())
+            val primerDrireccion: Direccion? = direccionesGuardadas.getOrNull(0)
+            val segundaDireccion: Direccion? = direccionesGuardadas.getOrNull(1)
+
+
+            // Agrega la dirección a la lista de direcciones guardadas
+            direccionesGuardadas.add(0, nuevaDireccion)
+            if (primerDrireccion!=null) direccionesGuardadas.add(1, primerDrireccion)
+            if (segundaDireccion!=null)direccionesGuardadas.add(2, segundaDireccion)
+            Log.d("DIRECCIONESG", "direccionesGuardadas ${direccionesGuardadas} ")
+
+
+
+
+
+
+            // Limita el tamaño de la lista a las últimas 3 direcciones
+            if (direccionesGuardadas.size > MAX_DIRECCIONES_GUARDADAS) {
+                direccionesGuardadas.removeAt(direccionesGuardadas.size - 1)
             }
 
-            override fun onLost(network: Network) {
-                // La conexión a internet se perdió
-                binding.imageViewInternet.setImageResource(R.drawable.ic_no_internet_rojo)
-                Toast.makeText(context, "Sin Conexion a Internet ", Toast.LENGTH_SHORT).show()
-            }
+            // Actualiza la lista de direcciones guardadas en SharedPreferences
+            val gson = Gson()
+            val direccionesGuardadasStringSet = direccionesGuardadas.map { gson.toJson(it) }.toSet()
+            editor.putStringSet("direcciones", direccionesGuardadasStringSet)
+            editor.apply()
+        }
+    }
+
+    private fun  obtenerDireccionesGuardadas(): MutableList<Direccion> {
+        val sharedPreferences = getSharedPreferences("Direcciones", Context.MODE_PRIVATE)
+        val direccionesGuardadasSet = sharedPreferences.getStringSet("direcciones", emptySet())
+        val direccionesGuardadas = mutableListOf<Direccion>()
+        val gson = Gson()
+        val direccionType = object : TypeToken<Direccion>() {}.type
+
+        direccionesGuardadasSet?.forEach { direccionString ->
+            val direccion = gson.fromJson<Direccion>(direccionString, direccionType)
+            direccionesGuardadas.add(direccion)
         }
 
-        connectivityManager.registerNetworkCallback(networkRequest, networkCallback)
+        return direccionesGuardadas
     }
 
-    // Llama a este método para detener el monitoreo del estado de la red
-    private fun stopNetworkMonitoring() {
-        connectivityManager.unregisterNetworkCallback(networkCallback)
+    private fun obtenerPrimeraDireccionGuardada(): Direccion? {
+        autocompleteDestination = supportFragmentManager.findFragmentById(R.id.placesAutocompleteDestination) as AutocompleteSupportFragment
+        val direccionesGuardadas = obtenerDireccionesGuardadas()
+        val nombreDirecion = direccionesGuardadas.firstOrNull()
+        autocompleteDestination!!.setText(nombreDirecion?.nombre)
+        destinationLatLng= LatLng(nombreDirecion!!.latitud.toDouble(),nombreDirecion.longitud.toDouble())
+        destinationName= nombreDirecion?.nombre!!
+
+        return direccionesGuardadas.firstOrNull()
     }
+    private fun obtenerSegundaDireccionGuardada(): Direccion? {
+        autocompleteDestination = supportFragmentManager.findFragmentById(R.id.placesAutocompleteDestination) as AutocompleteSupportFragment
+        val direccionesGuardadas = obtenerDireccionesGuardadas()
+        val nombreDirecion = direccionesGuardadas.getOrNull(1)
+        autocompleteDestination!!.setText(nombreDirecion?.nombre)
+        destinationName= nombreDirecion?.nombre!!
+        destinationLatLng= LatLng(nombreDirecion!!.latitud.toDouble(),nombreDirecion.longitud.toDouble())
+        return direccionesGuardadas.getOrNull(1)
+    }
+    private fun obtenerTercerDireccionGuardada(): Direccion? {
+        autocompleteDestination = supportFragmentManager.findFragmentById(R.id.placesAutocompleteDestination) as AutocompleteSupportFragment
+        val direccionesGuardadas = obtenerDireccionesGuardadas()
+        val nombreDirecion = direccionesGuardadas.getOrNull(2)
+        autocompleteDestination!!.setText(nombreDirecion?.nombre)
+        destinationLatLng= LatLng(nombreDirecion!!.latitud.toDouble(),nombreDirecion.longitud.toDouble())
+        destinationName= nombreDirecion?.nombre!!
+        return direccionesGuardadas.getOrNull(2)
+    }
+
+    //AJUSTA EL TAMAÑO DE LA LETRA BOTON*************************
+    fun ajustarTamañoLetraBoton(boton: Button, origen: String) {
+        val tamañoBoton = 200/ boton.text.length
+        val numerodeLetras = boton.text.length
+        var tamañoLetra = (tamañoBoton * 1.2).toFloat() // Puedes ajustar el valor según tus necesidades
+
+        if (numerodeLetras in 1..10){
+            tamañoLetra = 23.0f
+        }
+
+        if (numerodeLetras in 10..15){
+            tamañoLetra = 21.0f
+        }
+        if (numerodeLetras in 15..25){
+            tamañoLetra = 18.0f
+        }
+        if (numerodeLetras in 15..25){
+            tamañoLetra = 17.0f
+        }
+
+        if (numerodeLetras in 25..100){
+            tamañoLetra = 16.0f
+        }
+
+        boton.setTextSize(TypedValue.COMPLEX_UNIT_PX, tamañoLetra)
+        Log.d("contraletra", "AJUSTAR boton.text.length ${boton.text.length} tamañoBoton $tamañoBoton tamañoLetra $tamañoLetra origen $origen ")
+    }
+    //************************************************************
+
+
+
+    // Llama a este método para comenzar a monitorear el estado de la red
+//    private fun startNetworkMonitoring(context: Context) {
+//        connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+//
+//        val networkRequest = NetworkRequest.Builder()
+//            .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
+//            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+//            .build()
+//
+//        networkCallback = object : ConnectivityManager.NetworkCallback() {
+//            override fun onAvailable(network: Network) {
+//                // La conexión a internet está disponible
+//
+//                binding.imageViewInternet.setImageResource(R.drawable.ic_internet)
+//                Toast.makeText(context, "Conexion a Internet Disponible", Toast.LENGTH_SHORT).show()
+//            }
+//
+//            override fun onLost(network: Network) {
+//                // La conexión a internet se perdió
+//                binding.imageViewInternet.setImageResource(R.drawable.ic_no_internet_rojo)
+//                Toast.makeText(context, "Sin Conexion a Internet ", Toast.LENGTH_SHORT).show()
+//            }
+//        }
+//
+//        connectivityManager.registerNetworkCallback(networkRequest, networkCallback)
+//    }
+//
+//    // Llama a este método para detener el monitoreo del estado de la red
+//    private fun stopNetworkMonitoring() {
+//        connectivityManager.unregisterNetworkCallback(networkCallback)
+//    }
 
 }

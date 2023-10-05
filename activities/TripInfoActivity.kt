@@ -42,7 +42,11 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 
 import android.net.Uri
-
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import kotlin.math.pow
+import kotlin.math.roundToLong
 
 
 class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, DirectionUtil.DirectionCallBack {
@@ -62,6 +66,7 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
     private var totalSinVeriBs = 0.0
     private var totalSinVeriBsDollar = 0.0
     private var tipoDepago = ""
+    private val notificationProvider = NotificationProvider()
 
     private var extraOriginName = ""
     private var extraDestinationName = ""
@@ -145,14 +150,9 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
         binding.imageViewBack.setOnClickListener { finish() }
         binding.btnConfirmRequest.setOnClickListener { goToSearchDriver()}
 
-
-
         //PARA ACTIVAR Y DESACTIVAR LOS TOOGER***********
         activarTooger()
         //***********************************************
-
-
-
     }
 
 
@@ -220,7 +220,8 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
     //TOTALIZA TODOS LOS RECIBOS DEL CLIENTE
      fun totalizaPagos(){
         pagoMoviles.clear()
-
+        totalDollar = 0.0
+        Log.d("BILLETERA", "Fun totalizaPagos pagoMoviles: ${pagoMoviles} totalDollar $totalDollar ")
         pagoMovilProvider.getPagoMovil(authProvider.getId()).get().addOnSuccessListener { query ->
             if (query != null) {
                 if (query.documents.size > 0) {
@@ -236,18 +237,63 @@ class TripInfoActivity : AppCompatActivity(), OnMapReadyCallback, Listener, Dire
                         }
 
                         if (pagoMovil.verificado != false) {
+                            Log.d("BILLETERA", "Fun totalizaPagos pagoMovil.montoDollar!!.toDouble(): ${pagoMovil.montoDollar!!.toDouble()} ")
                             totalBsVerifi += pagoMovil.montoBs!!.toDouble()
                             totalDollar += pagoMovil.montoDollar!!.toDouble()
+                            Log.d("BILLETERA", "Fun totalizaPagos EN EL FOR totalDollar: ${totalDollar} ")
                         }
                     }
                 }
             }
+            Log.d("BILLETERA", "antes de totalverdes totalizaPagos totalDollar ${totalDollar} ")
             val totalVerdes = totalDollar
-            binding.txtSaldo.text = totalDollar.toString()
+            val valorVerdesFormateado = String.format("%.2f", totalDollar)
+
+            binding.txtSaldo.text = valorVerdesFormateado.toString()
            // progressDialog.hideProgressBar(this)
-            updateBilletera(authProvider.getId(),totalVerdes)
+            updateBilletera(authProvider.getId(),totalDollar)
         }
 
+
+
+
+
+    }
+    //NOTIFICACIONES PUSH
+    private fun sendNotificationPagoMovil() {
+        val map = HashMap<String, String>()
+        map.put("title", "SOLICITUD VERIFICACION")
+        map.put("body","Un cliente esta realizando un Pago Movil para ser verificado " )
+        map.put("idBooking", authProvider.getId())
+
+        val body = FCMBody(
+            to = "idedelAdmen",//colocar el token
+            priority = "high",
+            ttl = "4500s",
+            data = map
+        )
+
+        notificationProvider.sendNotification(body).enqueue(object: Callback<FCMResponse> {
+            override fun onResponse(call: Call<FCMResponse>, response: Response<FCMResponse>) {
+                if (response.body() != null) {
+
+                    if (response.body()!!.success == 1) {
+                        Toast.makeText(this@TripInfoActivity, "Se envio la notificacion", Toast.LENGTH_LONG).show()
+                    }
+                    else {
+                        Toast.makeText(this@TripInfoActivity, "No se pudo enviar la notificacion", Toast.LENGTH_LONG).show()
+                    }
+                }
+                else {
+                    Toast.makeText(this@TripInfoActivity, "hubo un error enviando la notificacion", Toast.LENGTH_LONG).show()
+                }
+            }
+
+            override fun onFailure(call: Call<FCMResponse>, t: Throwable) {
+                Log.d("NOTIFICATION", "ERROR: ${t.message}")
+            }
+
+        })
     }
     //ACTUALIZA EL EL MONTO EN LA BILLETERA
     private fun updateBilletera(idDocument: String,totalDolar: Double) {
